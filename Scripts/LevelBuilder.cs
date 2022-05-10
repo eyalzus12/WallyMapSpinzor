@@ -8,7 +8,7 @@ public class LevelBuilder : Node2D
 	//change this path to read from somewhere else
 	public const string PATH = "C:/Users/eyalz/Desktop/scripts/swz stuff/dump/Dynamic/GIDoJoe.xml";
 	//increase this to make the moving platforms move faster. reduce to make slower.
-	public const float SPEED = 1/10f;
+	public const float SPEED = 1/20f;
 	
 	public LevelReader levelreader;
 	

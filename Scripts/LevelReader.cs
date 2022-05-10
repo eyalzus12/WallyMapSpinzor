@@ -1,5 +1,5 @@
 //#define HIDE_NAVNODES
-#define HIDE_NORMALS
+//#define HIDE_NORMALS
 
 using Godot;
 using System;
@@ -13,21 +13,21 @@ public class LevelReader
 {
 	public const float DEFAULT_RADIUS = 50f;
 	public const float ANCHOR_RADIUS = 25f;
+	public const float FIRE_OFFSET_RADIUS = 10f;
 	public const float DYNAMIC_RADIUS = 20f;
 	public const float NAVNODE_RADIUS = 10f;
 	public const float NORMAL_LENGTH = 50f;
 	
-	public const float TEAM_LINES_OFFSET = 2f;
+	public const float TEAM_LINES_OFFSET = 5f;
 	
-	public const float PRESSURE_PLATE_POWERS_OFFSET = 100f;
+	public const float PRESSURE_PLATE_POWERS_OFFSET = 50f;
 	public const float PRESSURE_PLATE_COOLDOWN_OFFSET = 50f;
 	public const float COLLISION_TAUNT_EVENT_OFFSET = 60f;
 	public const float DYNAMIC_TIME_OFFSET = 45f;
 	public const float DYNAMIC_PLATID_OFFSET = 10f;
 	public const float NAVNODE_ID_OFFSET = 10f;
 	
-	public const float PRESSURE_PLATE_DIR_LINE_HEIGHT = 10f;
-	public const float PRESSURE_PLATE_DIR_LINE_LENGTH = 100f;
+	public const float PRESSURE_PLATE_DIR_LINE_LENGTH = 50f;
 	public const float PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X = 10f;
 	public const float PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y = 10f;
 	
@@ -66,9 +66,19 @@ public class LevelReader
 	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.18f, 0.59f, 0.88f, 1);
 	
 	public static readonly Color PRESSURE_PLATE_LINE = new Color(1,1,1,1);
+	public static readonly Color PRESSURE_PLATE_FIRE_OFFSET = new Color(0,0,0,0.3f);
 	
 	public static readonly Color NORMAL_LINE = new Color(0.9f,0.9f,0.9f,0.5f);
 	
+	public static readonly Color[] TEAM_COLLISION = new Color[]
+	{
+		new Color(1, 0.65f, 0, 1),
+		new Color(1, 0, 0, 1),
+		new Color(0, 0, 1, 1),
+		new Color(0, 1, 0, 1),
+		new Color(1, 1, 0, 1),
+		new Color(1, 0, 1, 1)
+	};
 	
 	public static readonly Color[] GOAL_COLORS = new Color[]
 	{
@@ -80,12 +90,20 @@ public class LevelReader
 		new Color(1, 0, 1, 0.1f)
 	};
 	
-	public static readonly Color NAVNODE = new Color(0.5f, 0.5f, 0.5f, 0.5f);
-	
 	public static readonly Color DYNAMIC_COLLISION = new Color(0, 1, 0.84f, 0.3f);
 	public static readonly Color DYNAMIC_RESPAWN = new Color(1, 0.84f, 0, 0.3f);
 	public static readonly Color DYNAMIC_ITEM_SPAWN = new Color(0.84f, 1, 0, 0.3f);
 	public static readonly Color DYNAMIC_NAVNODE = new Color(0.84f, 1, 0.84f, 0.3f);
+	
+	public static readonly Dictionary<string, Color> NAVNODE_COLORS = new Dictionary<string, Color>
+	{
+		{"", new Color(0.5f, 0.5f, 0.5f, 0.3f)},
+		{"A", new Color(0, 0, 1, 0.3f)},
+		{"D", new Color(1, 0, 0, 0.3f)},
+		{"G", new Color(1, 0.647f, 0, 0.3f)},
+		{"L", new Color(0, 1, 0, 0.3f)},
+		{"W", new Color(1, 1, 0, 0.3f)}
+	};
 	
 	public XDocument document;
 	public Dictionary<string, Generator> generators;
@@ -105,16 +123,61 @@ public class LevelReader
 	
 	public void Reset()
 	{
-		generators = new Dictionary<string, Generator>();
+		InitGenerators();
+		
 		dynamicMovementDict = new Dictionary<int, KeyframeStepper>();
 		navnodesPositions = new Dictionary<int, Vector2>();
-		InitGenerators();
 		
 		var first = document.FirstNode as XElement;
 		defaultNumFrames = first.GetIntAttribute("NumFrames", -1);
 		defaultSlowMult = first.GetFloatAttribute("SlowMult", 1f);
 		
 		first.Elements("MovingPlatform").ForEach(SetupMovingPlatform);
+	}
+	
+	public void InitGenerators()
+	{
+		generators = new Dictionary<string, Generator>()
+		{
+			{"CameraBounds", GenerateCameraBoundsAction},
+			{"SpawnBotBounds", GenerateSpawnBotBoundsAction},
+			
+			
+			{"ItemSpawn", GenerateItemSpawnAction},
+			{"ItemInitSpawn", GenerateInitialItemSpawnAction},
+			{"ItemSet", GenerateItemSetAction},
+			{"DynamicItemSpawn", GenerateDynamicItemSpawnAction},
+			
+			{"Respawn", GenerateRespawnAction},
+			{"DynamicRespawn", GenerateDynamicRespawnAction},
+			
+			{"HardCollision", GenerateHardCollisionAction},
+			{"SoftCollision", GenerateSoftCollisionAction},
+			{"NoSlideCollision", GenerateNoSlideCollisionAction},
+			
+			{"GameModeHardCollision", GenerateGamemodeHardCollisionAction},
+			{"GameModeSoftCollision", GenerateGamemodeSoftCollisionAction},
+			{"GameModeNoSlideCollision", GenerateGamemodeNoSlideCollisionAction},
+			
+			{"BouncyHardCollision", GenerateBouncyHardCollisionAction},
+			{"BouncySoftCollision", GenerateBouncySoftCollisionAction},
+			{"BouncyNoSlideCollision", GenerateBouncyNoSlideCollisionAction},
+			
+			{"PressurePlateCollision", GeneratePressurePlateCollisionAction},
+			{"SoftPressurePlateCollision", GenerateSoftPressurePlateCollisionAction},
+			
+			{"DynamicCollision", GenerateDynamicCollisionAction},
+			
+			
+			#if HIDE_NAVNODES
+			#else
+			{"NavNode", GenerateNavNodeAction},
+			{"DynamicNavNode", GenerateDynamicNavNodeAction},
+			#endif
+			
+			
+			{"Goal", GenerateGoalAction}
+		};
 	}
 	
 	public string Read(string filepath)
@@ -125,55 +188,6 @@ public class LevelReader
 		var content = f.GetAsText();//read text
 		f.Close();//flush buffer
 		return content;
-	}
-	
-	public void InitGenerators()
-	{
-		AddGenerator("CameraBounds", GenerateCameraBoundsAction);
-		AddGenerator("SpawnBotBounds", GenerateSpawnBotBoundsAction);
-		
-		
-		AddGenerator("ItemSpawn", GenerateItemSpawnAction);
-		AddGenerator("ItemInitSpawn", GenerateInitialItemSpawnAction);
-		AddGenerator("ItemSet", GenerateItemSetAction);
-		
-		
-		AddGenerator("Respawn", GenerateRespawnAction);
-		
-		
-		AddGenerator("HardCollision", GenerateHardCollisionAction);
-		AddGenerator("SoftCollision", GenerateSoftCollisionAction);
-		AddGenerator("NoSlideCollision", GenerateNoSlideCollisionAction);
-		
-		AddGenerator("GameModeHardCollision", GenerateGamemodeHardCollisionAction);
-		AddGenerator("GameModeSoftCollision", GenerateGamemodeSoftCollisionAction);
-		AddGenerator("GameModeNoSlideCollision", GenerateGamemodeNoSlideCollisionAction);
-		
-		AddGenerator("BouncyHardCollision", GenerateBouncyHardCollisionAction);
-		AddGenerator("BouncySoftCollision", GenerateBouncySoftCollisionAction);
-		AddGenerator("BouncyNoSlideCollision", GenerateBouncyNoSlideCollisionAction);
-		
-		AddGenerator("PressurePlateCollision", GeneratePressurePlateCollisionAction);
-		AddGenerator("SoftPressurePlateCollision", GenerateSoftPressurePlateCollisionAction);
-		
-		
-		AddGenerator("Goal", GenerateGoalAction);
-		
-		#if HIDE_NAVNODES
-		#else
-		AddGenerator("NavNode", GenerateNavNodeAction);
-		#endif
-		
-		AddGenerator("DynamicCollision", GenerateDynamicCollisionAction);
-		
-		
-		AddGenerator("DynamicRespawn", GenerateDynamicRespawnAction);
-		AddGenerator("DynamicItemSpawn", GenerateDynamicItemSpawnAction);
-		
-		#if HIDE_NAVNODES
-		#else
-		AddGenerator("DynamicNavNode", GenerateDynamicNavNodeAction);
-		#endif
 	}
 	
 	public Generator GetGenerator(string s) => (generators.ContainsKey(s))?(generators[s]):EMPTY_GENERATOR;
@@ -288,8 +302,8 @@ public class LevelReader
 			lineaction = lineaction.Chain<CanvasItem>(
 				(ci) =>
 				{
-					ci.DrawLine(@from+teamoffset, to+teamoffset, GOAL_COLORS[team]);
-					ci.DrawLine(@from-teamoffset, to-teamoffset, GOAL_COLORS[team]);
+					ci.DrawLine(@from+teamoffset, to+teamoffset, TEAM_COLLISION[team]);
+					ci.DrawLine(@from-teamoffset, to-teamoffset, TEAM_COLLISION[team]);
 				}
 			);
 		}
@@ -339,35 +353,33 @@ public class LevelReader
 		var powers = element.GetAttribute("TrapPowers").Replace(",", " ");
 		var cooldown = element.GetIntAttribute("Cooldown");
 		
-		var dir = (to-@from).Normalized();
-		var normal = new Vector2(-dir.y, dir.x);
-		if(element.HasAttribute("NormalX")) normal.x = element.GetFloatAttribute("NormalX");
-		if(element.HasAttribute("NormalY")) normal.y = element.GetFloatAttribute("NormalY");
-		
-		/*var fireoffsetX = float.Parse(element.GetAttribute("FireOffsetX",""));
+		var fireoffsetX = float.Parse(element.GetAttribute("FireOffsetX",""));
 		var fireoffsetY = float.Parse(element.GetAttribute("FireOffsetY",""));
-		var fireoffset = new Vector2(fireoffsetX, fireoffsetY);*/
+		var fireoffset = new Vector2(fireoffsetX, fireoffsetY);
+		
+		var middle = (@from+to)/2f;
+		var firePos = middle + fireoffset;
 		
 		var baseaction =  GenerateGenericCollisionAction(element, offset, color).Chain<CanvasItem>(
 			(ci) =>
 			{
-				ci.DrawString(FONT, labelPos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
+				ci.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
 				ci.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
+				ci.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
+				ci.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
 			}
 		);
 		
 		var faceleft = bool.Parse(element.GetAttribute("FaceLeft",""));
 		var dirmult = faceleft?1:-1;
-		var middle = (@from+to)/2f;
-		var linestart = middle - PRESSURE_PLATE_DIR_LINE_HEIGHT*normal;
-		var lineend = linestart + dirmult*PRESSURE_PLATE_DIR_LINE_LENGTH*Vector2.Left;
+		var lineend = firePos + dirmult*PRESSURE_PLATE_DIR_LINE_LENGTH*Vector2.Left;
 		var sideline1 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
 		var sideline2 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, -PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
 		
 		baseaction = baseaction.Chain<CanvasItem>(
 			(ci) =>
 			{
-				ci.DrawLine(linestart, lineend, PRESSURE_PLATE_LINE);
+				ci.DrawLine(firePos, lineend, PRESSURE_PLATE_LINE);
 				ci.DrawLine(lineend, sideline1, PRESSURE_PLATE_LINE);
 				ci.DrawLine(lineend, sideline2, PRESSURE_PLATE_LINE);
 			}
@@ -402,7 +414,7 @@ public class LevelReader
 		navnodesPositions.Add(ID, pos);
 		return (ci) =>
 		{
-			ci.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE);
+			ci.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[GetNavType(navid)]);
 			ci.DrawString(FONT, pos + NAVNODE_ID_OFFSET*Vector2.Up, $"NavID: {navid}");
 		};
 	}
@@ -414,13 +426,11 @@ public class LevelReader
 		var action = EMPTY_ACTION;
 		
 		element
-			.GetAttribute("Path")
-			.Split(",")
-			.Where((i) => navnodesPositions.ContainsKey(NormalizeNavID(i)))
-			.Select((i) => navnodesPositions[NormalizeNavID(i)])
-			.ForEach(
-				(p) => action = action.Chain<CanvasItem>(
-					(ci) => ci.DrawLine(pos, p, NAVNODE)
+			.GetAttribute("Path")//get path
+			.Split(",")//split to parts
+			.ForEach(//add line actions
+				(s) => action = action.Chain<CanvasItem>(
+					(ci) => ci.DrawLine(pos, (pos+navnodesPositions[NormalizeNavID(s)])/2f, NAVNODE_COLORS[GetNavType(s)])
 				)
 			);
 		
@@ -429,9 +439,16 @@ public class LevelReader
 	
 	public int NormalizeNavID(string s)
 	{
-		var first_char_val = s[0]-'0';
-		if(first_char_val < 0 || 9 < first_char_val) s = s.Substring(1);
+		if(s[0] < '0' || '9' < s[0]) s = s.Substring(1);
 		return int.Parse(s);
+	}
+	
+	private readonly static HashSet<char> TYPES = new HashSet<char>{'A', 'D', 'G', 'L', 'W'};
+	public string GetNavType(string s)
+	{
+		char first = s[0];
+		if(TYPES.Contains(first)) return $"{first}";
+		else return "";
 	}
 	
 	//////////////////////////////////////////
