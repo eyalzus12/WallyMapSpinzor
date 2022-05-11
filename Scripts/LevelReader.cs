@@ -67,8 +67,8 @@ public class LevelReader
 	public static readonly Color PRESSURE_PLATE_COLLISION = new Color(0.8f, 0.4f, 0.1f, 1);
 	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.5f, 0.1f, 0, 1);
 	
-	public static readonly Color PRESSURE_PLATE_LINE = new Color(1,1,1,1);
-	public static readonly Color PRESSURE_PLATE_FIRE_OFFSET = new Color(0,0,0,0.3f);
+	public static readonly Color PRESSURE_PLATE_LINE = new Color(1,0.5f,0,1);
+	public static readonly Color PRESSURE_PLATE_FIRE_OFFSET = new Color(1,0.1f,0,0.3f);
 	
 	public static readonly Color NORMAL_LINE = new Color(0.9f,0.9f,0.9f,0.5f);
 	
@@ -450,11 +450,10 @@ public class LevelReader
 		return int.Parse(s);
 	}
 	
-	private readonly static HashSet<char> TYPES = new HashSet<char>{'A', 'D', 'G', 'L', 'W'};
 	public string GetNavType(string s)
 	{
 		char first = s[0];
-		if(TYPES.Contains(first)) return $"{first}";
+		if(NAVNODE_COLORS.ContainsKey(first.ToString())) return $"{first}";
 		else return "";
 	}
 	
@@ -474,7 +473,7 @@ public class LevelReader
 		var data = animationElement.GetElementKeyframes(mult);
 		
 		var stepper = new KeyframeStepper(data, numframes*mult);
-		stepper.AdvanceTime((float)startframe);
+		stepper.AdvanceTime(startframe*mult);
 		dynamicMovementDict.Add(platid, stepper);
 	}
 	
