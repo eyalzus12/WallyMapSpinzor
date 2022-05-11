@@ -1,5 +1,7 @@
-//#define HIDE_NAVNODES
-//#define HIDE_NORMALS
+#define HIDE_NAVNODES
+#define HIDE_NORMALS
+#define HIDE_TRAP_POWERS
+#define HIDE_DYNAMICS
 
 using Godot;
 using System;
@@ -40,7 +42,7 @@ public class LevelReader
 	public static readonly Color SPAWNBOT_BOUNDS = new Color(1, 1, 0.6f, 1);
 	public static readonly Color BLASTZONE_BOUNDS = new Color(0, 0, 0, 1);
 	
-	public static readonly Color ITEM_SPAWN = new Color(0, 0, 1, 0.3f);
+	public static readonly Color ITEM_SPAWN = new Color(0, 0.5f, 1, 0.5f);
 	public static readonly Color INITIAL_ITEM_SPAWN = new Color(0.5f, 0, 0.5f, 0.5f);
 	public static readonly Color ITEM_SET = new Color(0, 0, 0.5f, 0.5f);
 	
@@ -62,8 +64,8 @@ public class LevelReader
 	public static readonly Color BOUNCY_SOFT_COLLISION = new Color(0.5f, 0.5f, 0.2f, 1);
 	public static readonly Color BOUNCY_NOSLIDE_COLLISION = new Color(0.2f, 0.5f, 0.5f, 1);
 	
-	public static readonly Color PRESSURE_PLATE_COLLISION = new Color(0.82f, 0.41f, 0.12f, 1);
-	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.18f, 0.59f, 0.88f, 1);
+	public static readonly Color PRESSURE_PLATE_COLLISION = new Color(0.8f, 0.4f, 0.1f, 1);
+	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.5f, 0.1f, 0, 1);
 	
 	public static readonly Color PRESSURE_PLATE_LINE = new Color(1,1,1,1);
 	public static readonly Color PRESSURE_PLATE_FIRE_OFFSET = new Color(0,0,0,0.3f);
@@ -353,25 +355,30 @@ public class LevelReader
 		var powers = element.GetAttribute("TrapPowers").Replace(",", " ");
 		var cooldown = element.GetIntAttribute("Cooldown");
 		
+		var faceleft = bool.Parse(element.GetAttribute("FaceLeft",""));
+		var dirmult = faceleft?1:-1;
+		
 		var fireoffsetX = float.Parse(element.GetAttribute("FireOffsetX",""));
 		var fireoffsetY = float.Parse(element.GetAttribute("FireOffsetY",""));
 		var fireoffset = new Vector2(fireoffsetX, fireoffsetY);
 		
 		var middle = (@from+to)/2f;
-		var firePos = middle + fireoffset;
+		var firePos = fireoffset + offset;
 		
 		var baseaction =  GenerateGenericCollisionAction(element, offset, color).Chain<CanvasItem>(
 			(ci) =>
 			{
+				#if HIDE_TRAP_POWERS
+				#else
 				ci.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
+				#endif
+				
 				ci.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
 				ci.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
 				ci.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
 			}
 		);
 		
-		var faceleft = bool.Parse(element.GetAttribute("FaceLeft",""));
-		var dirmult = faceleft?1:-1;
 		var lineend = firePos + dirmult*PRESSURE_PLATE_DIR_LINE_LENGTH*Vector2.Left;
 		var sideline1 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
 		var sideline2 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, -PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
@@ -478,9 +485,12 @@ public class LevelReader
 		var pos = stepper.GetCurrent() + element.GetElementPosition() + offset;
 		return (ci) =>
 		{
+			#if HIDE_DYNAMICS
+			#else
 			ci.DrawString(FONT, pos + DYNAMIC_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
 			ci.DrawString(FONT, pos + DYNAMIC_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
 			ci.DrawCircle(pos, DYNAMIC_RADIUS, color);
+			#endif
 			
 			foreach(var colelem in element.Elements())
 				GetGenerator(colelem.Name.LocalName)(colelem, pos)(ci);

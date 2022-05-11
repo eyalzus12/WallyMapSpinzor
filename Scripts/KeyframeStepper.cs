@@ -9,9 +9,11 @@ public class KeyframeStepper
 	public List<Vector2> positions;
 	public float time;
 	public int current;
+	public float numframes;
 	
 	public KeyframeStepper(IEnumerable<(float, Vector2)> frames, float numframes)
 	{
+		this.numframes = numframes;
 		keyframes = new List<float>();
 		positions = new List<Vector2>();
 		
@@ -29,12 +31,6 @@ public class KeyframeStepper
 			positions.Add(temp_pos);
 		}
 		
-		if(keyframes[keyframes.Count-1] != numframes)
-		{
-			keyframes.Add(numframes);
-			positions.Add(positions[0]);
-		}
-		
 		time = 0;
 		current = 0;
 	}
@@ -42,7 +38,7 @@ public class KeyframeStepper
 	public void AdvanceTime(float t)
 	{
 		time += t;
-		time %= keyframes.Last();
+		time %= numframes;
 		current = keyframes.BinarySearch(time);
 		if(current < 0) current = ~current;
 		if(current == keyframes.Count) current = 0;
@@ -54,11 +50,20 @@ public class KeyframeStepper
 		if(prev == -1) prev = keyframes.Count-1;
 		
 		var posdiff = positions[current]-positions[prev];
+		
 		var timediff = (keyframes[current]-keyframes[prev]);
-		timediff %= keyframes.Last();
+		if(timediff < 0) timediff += numframes;
+		timediff %= numframes;
+		
+		if(timediff == 0) return positions[prev];
 		
 		var speed = posdiff/timediff;
-		var dist = speed*(time-keyframes[prev]);
+		
+		var partialdiff = time-keyframes[prev];
+		if(partialdiff < 0) partialdiff += numframes;
+		partialdiff %= numframes;
+		
+		var dist = speed*partialdiff;
 		return positions[prev]+dist;
 	}
 }
