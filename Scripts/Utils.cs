@@ -106,10 +106,10 @@ public static class Utils
 	
 	public static IEnumerable<(float, Vector2)> GetPhase(this XElement element, float mult = 1f)
 	{
-		var start = mult*int.Parse(element.GetAttribute("StartFrame", ""));
-		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1f, start));
+		var start = mult*(int.Parse(element.GetAttribute("StartFrame", ""))-1);
+		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1f, start+mult));
 		var firstkeyframenum = element.Elements("KeyFrame").First().GetIntAttribute("FrameNum");
-		if(firstkeyframenum != start-1) result = result.Prepend((-1,(start-1)*Vector2.One));
+		if(firstkeyframenum != 0) result = result.Prepend((-1,start*Vector2.One));
 		return result;
 	}
 	

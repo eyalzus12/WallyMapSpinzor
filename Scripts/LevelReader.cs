@@ -113,6 +113,7 @@ public class LevelReader
 	public Dictionary<int, Vector2> navnodesPositions;
 	public int defaultNumFrames;
 	public float defaultSlowMult;
+	public long callCount;
 	
 	public LevelReader() {}
 	
@@ -126,6 +127,7 @@ public class LevelReader
 	public void Reset()
 	{
 		InitGenerators();
+		callCount = 0;
 		
 		dynamicMovementDict = new Dictionary<int, KeyframeStepper>();
 		navnodesPositions = new Dictionary<int, Vector2>();
@@ -201,6 +203,7 @@ public class LevelReader
 		var first = document.FirstNode as XElement;
 		var actions = first.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,Vector2.Zero));
 		actions = actions.Concat(GenerateNavNodeActionList(first));
+		callCount++;
 		return actions;
 	}
 	
@@ -417,32 +420,53 @@ public class LevelReader
 		var y = element.GetFloatAttribute("Y", 0f);
 		var pos = new Vector2(x,y) + offset;
 		var navid = element.GetAttribute("NavID");
-		var ID = NormalizeNavID(navid);
-		navnodesPositions.Add(ID, pos);
+		var id = NormalizeNavID(navid);
+		var type = GetNavType(navid);
+		navnodesPositions.Add(id, pos);
 		return (ci) =>
 		{
-			ci.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[GetNavType(navid)]);
+			ci.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[type]);
 			ci.DrawString(FONT, pos + NAVNODE_ID_OFFSET*Vector2.Up, $"NavID: {navid}");
 		};
 	}
 	
 	public DrawAction GenerateNavLineAction(XElement element)
 	{
-		var ID = NormalizeNavID(element.GetAttribute("NavID"));
-		var pos = navnodesPositions[ID];
+		var navid = element.GetAttribute("NavID");
+		var id = NormalizeNavID(navid);
+		var type = GetNavType(navid);
+		
+		var pos = navnodesPositions[id];
 		var action = EMPTY_ACTION;
 		
 		element
 			.GetAttribute("Path")//get path
 			.Split(",")//split to parts
 			.ForEach(//add line actions
-				(s) => action = action.Chain<CanvasItem>(
-					(ci) => ci.DrawLine(pos, (pos+navnodesPositions[NormalizeNavID(s)])/2f, NAVNODE_COLORS[GetNavType(s)])
-				)
+				(s) =>
+				{
+					var norms = NormalizeNavID(s);
+					var types = GetNavType(s);
+					if(!navnodesPositions.ContainsKey(norms))
+					{
+						if(callCount == 1)
+						{
+							var stypedesc = (types!="")?$" with type {types}":"";
+							GD.Print($"NavNode {navid} connects to NavNode {norms}{stypedesc}, but there's no NavNode with ID {norms}");
+						}
+						return;
+					}
+					
+					action = action.Chain<CanvasItem>(
+						(ci) => ci.DrawLine(pos, (pos+navnodesPositions[norms])/2f, NAVNODE_COLORS[types])
+					);
+				}
 			);
 		
 		return action;
 	}
+	
+	
 	
 	public int NormalizeNavID(string s)
 	{
@@ -472,7 +496,7 @@ public class LevelReader
 		
 		var data = animationElement.GetElementKeyframes(mult);
 		
-		var stepper = new KeyframeStepper(data, numframes*mult);
+		var stepper = new KeyframeStepper(data, numframes*mult-1);
 		stepper.AdvanceTime(startframe*mult);
 		dynamicMovementDict.Add(platid, stepper);
 	}
