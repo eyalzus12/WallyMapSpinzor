@@ -2,6 +2,8 @@
 #define HIDE_NORMALS
 #define HIDE_TRAP_POWERS
 #define HIDE_DYNAMICS
+#define HIDE_TEAM_COL
+//#define HIDE_ASSETS
 
 using Godot;
 using System;
@@ -114,11 +116,15 @@ public class LevelReader
 	public int defaultNumFrames;
 	public float defaultSlowMult;
 	public long callCount;
+	public string assetDir;
+	
+	public string mapArtPath;
 	
 	public LevelReader() {}
 	
-	public LevelReader(string filepath)
+	public LevelReader(string filepath, string mapart)
 	{
+		mapArtPath = mapart;
 		var content = Read(filepath);
 		document = XDocument.Parse(content);
 		Reset();
@@ -126,13 +132,17 @@ public class LevelReader
 	
 	public void Reset()
 	{
+		var first = document.FirstNode as XElement;
+		
+		assetDir = first.GetAttribute("AssetDir");
+		
 		InitGenerators();
 		callCount = 0;
 		
 		dynamicMovementDict = new Dictionary<int, KeyframeStepper>();
 		navnodesPositions = new Dictionary<int, Vector2>();
 		
-		var first = document.FirstNode as XElement;
+		
 		defaultNumFrames = first.GetIntAttribute("NumFrames", -1);
 		defaultSlowMult = first.GetFloatAttribute("SlowMult", 1f);
 		
@@ -180,7 +190,13 @@ public class LevelReader
 			#endif
 			
 			
-			{"Goal", GenerateGoalAction}
+			{"Goal", GenerateGoalAction},
+			
+			#if HIDE_ASSETS
+			#else
+			//{"Background", GenerateBackgroundAction},
+			{"Platform", GeneratePlatformAction}
+			#endif
 		};
 	}
 	
@@ -210,12 +226,13 @@ public class LevelReader
 	public IEnumerable<DrawAction> GenerateNavNodeActionList(XElement element)
 	{
 		#if HIDE_NAVNODES
-		yield break;
-		#endif
-		
+		#else
 		var iterateOver = (element.Elements("DynamicNavNode").Prepend(element));
 		foreach(var e in iterateOver) foreach(var n in e.Elements("NavNode"))
 			yield return GenerateNavLineAction(n);
+		#endif
+		
+		yield break;
 	}
 	
 	//////////////////////////////////////////
@@ -300,6 +317,8 @@ public class LevelReader
 			#endif
 		};
 		
+		#if HIDE_TEAM_COL
+		#else
 		if(element.HasAttribute("Team"))
 		{
 			var teamoffset = TEAM_LINES_OFFSET * clockwise_dir;
@@ -312,6 +331,7 @@ public class LevelReader
 				}
 			);
 		}
+		#endif
 		
 		if(element.HasAttribute("TauntEvent"))
 		{
@@ -416,8 +436,8 @@ public class LevelReader
 	
 	public DrawAction GenerateNavNodeAction(XElement element, Vector2 offset)
 	{
-		var x = element.GetFloatAttribute("X", 0f);
-		var y = element.GetFloatAttribute("Y", 0f);
+		var x = element.GetFloatAttribute("X");
+		var y = element.GetFloatAttribute("Y");
 		var pos = new Vector2(x,y) + offset;
 		var navid = element.GetAttribute("NavID");
 		var id = NormalizeNavID(navid);
@@ -439,6 +459,8 @@ public class LevelReader
 		var pos = navnodesPositions[id];
 		var action = EMPTY_ACTION;
 		
+		var firstcall = (callCount == 0);
+		
 		element
 			.GetAttribute("Path")//get path
 			.Split(",")//split to parts
@@ -449,7 +471,7 @@ public class LevelReader
 					var types = GetNavType(s);
 					if(!navnodesPositions.ContainsKey(norms))
 					{
-						if(callCount == 1)
+						if(firstcall)
 						{
 							var stypedesc = (types!="")?$" with type {types}":"";
 							GD.Print($"NavNode {navid} connects to NavNode {norms}{stypedesc}, but there's no NavNode with ID {norms}");
@@ -480,6 +502,77 @@ public class LevelReader
 		if(NAVNODE_COLORS.ContainsKey(first.ToString())) return $"{first}";
 		else return "";
 	}
+	
+	//////////////////////////////////////////
+	////////////////Assets////////////////////
+	//////////////////////////////////////////
+	public DrawAction GenerateGenericAssetAction(XElement element, string assetfolder, Vector2 pos, Vector2 scale, float rot)
+	{
+		var X = element.GetFloatAttribute("X");
+		var Y = element.GetFloatAttribute("Y");
+		pos += new Vector2(X,Y);
+		
+		var W = element.GetFloatAttribute("W");
+		var H = element.GetFloatAttribute("H");
+		var bounds = new Vector2(W, H);
+		
+		var assetname = element.GetAttribute("AssetName");
+		var assetpath = $"{mapArtPath}/{assetfolder}/{assetname}";
+		var texture = Utils.LoadImageFromPath(assetpath, bounds, scale);
+		if(texture is null) return EMPTY_ACTION;
+		return (ci) =>
+		{
+			ci.DrawSetTransform(pos, rot.ToRad(), scale);
+			ci.DrawTexture(texture, Vector2.Zero);
+			ci.DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+		};
+	}
+	
+	
+	public DrawAction GenerateBackgroundAction(XElement element, Vector2 offset) => GenerateGenericAssetAction(element, "Backgrounds", offset, Vector2.One, 0f);
+	
+	public DrawAction GeneratePlatformAction(XElement element, Vector2 pos, Vector2 scale, float rot)
+	{
+		if(element.HasAttribute("Theme") || element.HasAttribute("ScoringType")) return EMPTY_ACTION;
+		
+		if(element.HasAttribute("Scale"))
+			scale *= element.GetFloatAttribute("Scale");
+		else
+		{
+			var scaleX = element.GetFloatAttribute("ScaleX", 1f);
+			var scaleY = element.GetFloatAttribute("ScaleY", 1f);
+			scale *= new Vector2(scaleX, scaleY);
+		}
+		
+		rot += element.GetFloatAttribute("Rotation");
+		
+		if(element.HasAttribute("AssetName"))
+			return GenerateGenericAssetAction(element, assetDir, pos, scale, rot);
+		else
+		{
+			var X = element.GetFloatAttribute("X");
+			var Y = element.GetFloatAttribute("Y");
+			pos += new Vector2(X,Y);
+			
+			var action = EMPTY_ACTION;
+			
+			element.Elements("Asset").ForEach(
+				(e) => action = action.Chain<CanvasItem>(
+					GenerateGenericAssetAction(e, assetDir, pos, scale, rot)
+				)
+			);
+			
+			element.Elements("Platform").ForEach(
+				(e) => action = action.Chain<CanvasItem>(
+					GeneratePlatformAction(e, pos, scale, rot)
+				)
+			);
+			
+			return action;
+		}
+	}
+	
+	public DrawAction GeneratePlatformAction(XElement element, Vector2 offset) => GeneratePlatformAction(element, offset, Vector2.One, 0f);
 	
 	//////////////////////////////////////////
 	////////////////Dynamic///////////////////

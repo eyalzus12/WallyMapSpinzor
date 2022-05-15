@@ -6,6 +6,8 @@ using System.Linq;
 
 public static class Utils
 {
+	public static Dictionary<string, ImageTexture> Cache = new Dictionary<string, ImageTexture>();
+	
 	public static bool HasAttribute(this XElement element, string attribute) => (element.Attributes(attribute).Count() > 0);
 	
 	public static string GetAttribute(this XElement element, string attribute, string @default = "")
@@ -127,4 +129,26 @@ public static class Utils
 	}
 	
 	public static void ForEach(this IEnumerable<object> enumerable, Action<object> action) => enumerable.ForEach<object>(action);
+	
+	public static ImageTexture LoadImageFromPath(string path, Vector2 bounds, Vector2 scale)
+	{
+		if(Cache.ContainsKey(path)) return Cache[path];
+		
+		var image = new Image();
+		var er = image.Load(path);
+		if(er != Error.Ok) 
+		{
+			GD.Print($"Got error {er} while attempting to load image from path {path}");
+			Cache.Add(path, null);
+			return null;
+		}
+		
+		image.Resize((int)(bounds.x), (int)(bounds.y), (Image.Interpolation)4);
+		var texture = new ImageTexture();
+		texture.CreateFromImage(image);
+		Cache.Add(path, texture);
+		return texture;
+	}
+	
+	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
 }
