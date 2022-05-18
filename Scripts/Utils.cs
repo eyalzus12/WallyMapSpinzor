@@ -6,7 +6,7 @@ using System.Linq;
 
 public static class Utils
 {
-	public static Dictionary<string, ImageTexture> Cache = new Dictionary<string, ImageTexture>();
+	public static Dictionary<(string, string), ImageTexture> Cache = new Dictionary<(string, string), ImageTexture>();
 	
 	public static bool HasAttribute(this XElement element, string attribute) => (element.Attributes(attribute).Count() > 0);
 	
@@ -90,6 +90,11 @@ public static class Utils
 		return (T t) => {a(t); b(t);};
 	}
 	
+	public static Action<T> Combine<T>(this IEnumerable<Action<T>> e)
+	{
+		return (T t) => {foreach(var a in e) a(t);};
+	}
+	
 	public static IEnumerable<(float, Vector2)> GetElementKeyframes(this XElement element, float mult = 1f)
 	{
 		foreach(var anmelem in element.Elements())
@@ -130,25 +135,30 @@ public static class Utils
 	
 	public static void ForEach(this IEnumerable<object> enumerable, Action<object> action) => enumerable.ForEach<object>(action);
 	
-	public static ImageTexture LoadImageFromPath(string path, Vector2 bounds, Vector2 scale)
+	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds, Vector2 scale)
 	{
-		if(Cache.ContainsKey(path)) return Cache[path];
+		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];
 		
 		var image = new Image();
 		var er = image.Load(path);
 		if(er != Error.Ok) 
 		{
 			GD.Print($"Got error {er} while attempting to load image from path {path}");
-			Cache.Add(path, null);
+			Cache.Add((path,instanceName), null);
 			return null;
 		}
 		
+		if(bounds.x == 0f) bounds.x = image.GetWidth();
+		if(bounds.y == 0f) bounds.y = image.GetHeight();
+		bounds = bounds.Abs();
 		image.Resize((int)(bounds.x), (int)(bounds.y), (Image.Interpolation)4);
 		var texture = new ImageTexture();
-		texture.CreateFromImage(image);
-		Cache.Add(path, texture);
+		texture.CreateFromImage(image, 0b11);
+		Cache.Add((path,instanceName), texture);
 		return texture;
 	}
 	
 	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
+	
+	public static Vector2 Abs(this Vector2 v) => new Vector2(Math.Abs(v.x), Math.Abs(v.y));
 }

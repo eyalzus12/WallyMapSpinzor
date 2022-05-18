@@ -11,7 +11,7 @@ public class KeyframeStepper
 	public int current;
 	public float numframes;
 	
-	public KeyframeStepper(IEnumerable<(float, Vector2)> frames, float numframes)
+	public KeyframeStepper(IEnumerable<(float, Vector2)> frames, Vector2 offset, float numframes)
 	{
 		this.numframes = numframes;
 		keyframes = new List<float>();
@@ -20,11 +20,11 @@ public class KeyframeStepper
 		foreach((float key, Vector2 position) in frames)
 		{
 			var temp_key = key;
-			var temp_pos = position;
+			var temp_pos = position + offset;
 			if(temp_key == -1)
 			{
 				temp_key = temp_pos.x;
-				temp_pos = positions.Last();
+				temp_pos = positions.Last() + offset;
 			}
 			
 			keyframes.Add(temp_key);
