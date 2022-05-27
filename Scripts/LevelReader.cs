@@ -13,7 +13,8 @@ using System.Linq;
 using System.Collections.Generic;
 using DrawAction = System.Action<Godot.CanvasItem>;
 using Generator = System.Func<System.Xml.Linq.XElement, Godot.Vector2, System.Action<Godot.CanvasItem>>;
-using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Vector2, Godot.Vector2, float, System.Action<Godot.CanvasItem>>;
+//using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Vector2, Godot.Vector2, float, System.Action<Godot.CanvasItem>>;
+using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, System.Action<Godot.CanvasItem>>;
 
 public class LevelReader
 {
@@ -44,7 +45,7 @@ public class LevelReader
 	
 	public static readonly DrawAction EMPTY_ACTION = (ci) => {};
 	public static readonly Generator EMPTY_GENERATOR = (ci, offset) => EMPTY_ACTION;
-	public static readonly AssetGenerator EMPTY_ASSET_GENERATOR = (ci, offset, scale, rot) => EMPTY_ACTION;
+	public static readonly AssetGenerator EMPTY_ASSET_GENERATOR = (ci, trans) => EMPTY_ACTION;
 	
 	public static readonly Color CAMERA_BOUNDS = new Color(1, 0, 0, 0.5f);
 	public static readonly Color SPAWNBOT_BOUNDS = new Color(1, 1, 0.8f, 0.5f);
@@ -225,12 +226,17 @@ public class LevelReader
 	public DrawAction GenerateDrawAction(float timepass)
 	{
 		navnodesPositions = new Dictionary<int, Vector2>();
+		
 		foreach(var i in movingPlatformsDict.Keys) movingPlatformsDict[i].AdvanceTime(timepass);
+		
 		var first = document.FirstNode as XElement;
-		var assetActions = first.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,Vector2.Zero,Vector2.One,0f));
+		
+		var assetActions = first.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,Transform2D.Identity));
 		var actions = first.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,Vector2.Zero));
 		var navactions = GenerateNavNodeActionList(first);
+		
 		callCount++;
+		
 		return assetActions.Concat(actions).Concat(navactions).Combine<CanvasItem>();
 	}
 	
@@ -535,72 +541,90 @@ public class LevelReader
 	//////////////////////////////////////////
 	////////////////Assets////////////////////
 	//////////////////////////////////////////
-	public DrawAction GenerateGenericAssetAction(XElement element, string assetfolder, string instanceName, Vector2 pos, Vector2 scale, float rot)
+	public DrawAction GenerateGenericAssetAction(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName)
 	{
-		var X = element.GetFloatAttribute("X");
-		var Y = element.GetFloatAttribute("Y");
-		pos += new Vector2(X,Y);
+		if(doOffset)
+		{
+			var X = element.GetFloatAttribute("X");
+			var Y = element.GetFloatAttribute("Y");
+			var offset = new Vector2(X,Y);
+			trans = trans.Translated(offset);
+			//trans.origin += offset;
+		}
 		
 		var W = element.GetFloatAttribute("W");
 		var H = element.GetFloatAttribute("H");
 		var bounds = new Vector2(W, H);
-		if(bounds.x < 0) scale.x *= -1;
-		if(bounds.y < 0) scale.y *= -1;
+		if(bounds.x < 0f) trans *= Transform2D.FlipX;
+		if(bounds.y < 0f) trans *= Transform2D.FlipY;
 		
 		var assetname = element.GetAttribute("AssetName");
 		var assetpath = $"{mapArtPath}/{assetfolder}/{assetname}";
-		var texture = Utils.LoadImageFromPath(assetpath, instanceName, bounds, scale);
+		var texture = Utils.LoadImageFromPath(assetpath, instanceName, bounds);
 		if(texture is null) return EMPTY_ACTION;
 		return (ci) =>
 		{
-			ci.DrawSetTransform(pos, rot.ToRad(), scale);
+			ci.DrawSetTransformMatrix(trans);
 			ci.DrawTexture(texture, Vector2.Zero);
-			ci.DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+			ci.DrawSetTransformMatrix(Transform2D.Identity);
 		};
 	}
 	
 	
-	public DrawAction GenerateBackgroundAction(XElement element, Vector2 offset, Vector2 scale, float rot) => GenerateGenericAssetAction(element, "Backgrounds", "", offset, Vector2.One, 0f);
+	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element, trans, true, "Backgrounds", "");
 	
-	public DrawAction GeneratePlatformAction(XElement element, Vector2 pos, Vector2 scale, float rot)
+	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans)
 	{
-		if(element.HasAttribute("Theme") || element.HasAttribute("ScoringType")) return EMPTY_ACTION;
-		
 		var instanceName = element.GetAttribute("InstanceName");
 		
+		if(instanceName == "am_NoSkulls" || instanceName == "am_Holiday") return EMPTY_ACTION;
+		
+		DrawAction labelAction = (ci) => ci.DrawString(FONT, trans.origin, $"InstanceName: {instanceName}");
+		
+		var X = element.GetFloatAttribute("X");
+		var Y = element.GetFloatAttribute("Y");
+		var offset = new Vector2(X,Y);
+		trans = trans.Translated(offset);
+		//trans.origin += offset;
+		
 		if(element.HasAttribute("Scale"))
-			scale *= element.GetFloatAttribute("Scale");
+		{
+			var scale = element.GetFloatAttribute("Scale");
+			if(scale < 0f) trans *= (Transform2D.FlipX * Transform2D.FlipY);
+			trans = trans.Scaled(Math.Abs(scale)*Vector2.One);
+		}
 		else
 		{
 			var scaleX = element.GetFloatAttribute("ScaleX", 1f);
+			if(scaleX < 0f) trans *= Transform2D.FlipX;
 			var scaleY = element.GetFloatAttribute("ScaleY", 1f);
-			scale *= new Vector2(scaleX, scaleY);
+			if(scaleY < 0f) trans *= Transform2D.FlipY;
+			var scale = new Vector2(Math.Abs(scaleX), Math.Abs(scaleY));
+			trans = trans.Scaled(scale);
 		}
 		
-		rot += element.GetFloatAttribute("Rotation");
+		var rot = element.GetFloatAttribute("Rotation").ToRad();
+		trans = trans.Rotated(rot);
 		
 		if(element.HasAttribute("AssetName"))
-			return GenerateGenericAssetAction(element, assetDir, instanceName, pos, scale, rot);
+		{
+			return GenerateGenericAssetAction(element, trans, false, assetDir, instanceName);
+		}
 		else
 		{
-			var X = element.GetFloatAttribute("X");
-			var Y = element.GetFloatAttribute("Y");
-			pos += new Vector2(X,Y);
+			var assetActions = element.Elements("Asset").Select(e => GenerateGenericAssetAction(e, trans, true, assetDir, instanceName));
+			var platformActions = element.Elements("Platform").Select(e => GeneratePlatformAction(e, trans));
 			
-			var assetActions = element.Elements("Asset").Select(e => GenerateGenericAssetAction(e, assetDir, instanceName, pos, scale, rot));
-			var platformActions = element.Elements("Platform").Select(e => GeneratePlatformAction(e, pos, scale, rot));
-			
-			return assetActions.Concat(platformActions).Combine<CanvasItem>();
+			return assetActions.Concat(platformActions).Append(labelAction).Combine<CanvasItem>();
 		}
 	}
 	
-	public DrawAction GenerateMovingPlatformAction(XElement element, Vector2 offset, Vector2 scale, float rot)
+	public DrawAction GenerateMovingPlatformAction(XElement element, Transform2D trans)
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		var pos = stepper.GetCurrent() + offset;
-		
-		return element.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,pos,scale,rot)).Combine<CanvasItem>();
+		trans = trans.Translated(stepper.GetCurrent());
+		return element.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,trans)).Combine<CanvasItem>();
 	}
 	
 	public DrawAction GenerateSecondaryMovingPlatformAction(XElement element, Vector2 offset)

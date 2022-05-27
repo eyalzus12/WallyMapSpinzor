@@ -135,7 +135,7 @@ public static class Utils
 	
 	public static void ForEach(this IEnumerable<object> enumerable, Action<object> action) => enumerable.ForEach<object>(action);
 	
-	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds, Vector2 scale)
+	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds)
 	{
 		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];
 		
