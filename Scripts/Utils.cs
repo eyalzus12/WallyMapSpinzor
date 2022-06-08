@@ -6,6 +6,8 @@ using System.Linq;
 
 public static class Utils
 {
+	public const float PI_F = (float)Math.PI;
+	
 	public static Dictionary<(string, string), ImageTexture> Cache = new Dictionary<(string, string), ImageTexture>();
 	
 	public static bool HasAttribute(this XElement element, string attribute) => (element.Attributes(attribute).Count() > 0);
@@ -36,11 +38,32 @@ public static class Utils
 	}
 	
 	
-	public static Vector2 GetElementPosition(this XElement element)
+	public static Vector2 GetElementPosition(this XElement element, string prefix = "")
 	{
-		var x = float.Parse(element.GetAttribute("X", ""));
-		var y = float.Parse(element.GetAttribute("Y", ""));
+		var x = float.Parse(element.GetAttribute($"{prefix}X", ""));
+		var y = float.Parse(element.GetAttribute($"{prefix}Y", ""));
 		return new Vector2(x, y);
+	}
+	
+	public static Vector2 GetElementBounds(this XElement element)
+	{
+		var w = float.Parse(element.GetAttribute("W", ""));
+		var h = float.Parse(element.GetAttribute("H", ""));
+		return new Vector2(w, h);
+	}
+	
+	public static Vector2 GetElementPositionOrDefault(this XElement element, string prefix = "")
+	{
+		var x = float.Parse(element.GetAttribute($"{prefix}X", "0"));
+		var y = float.Parse(element.GetAttribute($"{prefix}Y", "0"));
+		return new Vector2(x, y);
+	}
+	
+	public static Vector2 GetElementBoundsOrDefault(this XElement element)
+	{
+		var w = float.Parse(element.GetAttribute("W", "0"));
+		var h = float.Parse(element.GetAttribute("H", "0"));
+		return new Vector2(w, h);
 	}
 	
 	public static (Vector2, Vector2) GetElementPoints(this XElement element)
@@ -78,11 +101,9 @@ public static class Utils
 	
 	public static Rect2 GetElementRect(this XElement element)
 	{
-		var x = float.Parse(element.GetAttribute("X", ""));
-		var y = float.Parse(element.GetAttribute("Y", ""));
-		var w = element.GetFloatAttribute("W");
-		var h = element.GetFloatAttribute("H");
-		return new Rect2(x, y, w, h);
+		var pos = element.GetElementPosition();
+		var bounds = element.GetElementBoundsOrDefault();
+		return new Rect2(pos.x, pos.y, bounds.x, bounds.y);
 	}
 	
 	public static Action<T> Chain<T>(this Action<T> a, Action<T> b)
@@ -95,37 +116,43 @@ public static class Utils
 		return (T t) => {foreach(var a in e) a(t);};
 	}
 	
-	public static IEnumerable<(float, Vector2)> GetElementKeyframes(this XElement element, float mult = 1f)
+	public static IEnumerable<Keyframe> GetElementKeyframes(this XElement element, float mult, bool hasCenter, Vector2 center)
 	{
 		foreach(var anmelem in element.Elements())
 		{
 			switch(anmelem.Name.LocalName)
 			{
 				case "KeyFrame":
-					yield return anmelem.GetKeyframe(mult);
+					yield return anmelem.GetKeyframe(mult, hasCenter, center, 0f);
 					break;
 				case "Phase":
-					foreach(var h in anmelem.GetPhase(mult)) yield return h;
+					foreach(var h in anmelem.GetPhase(mult, hasCenter, center)) yield return h;
 					break;
 			}
 		}
 	}
 	
-	public static IEnumerable<(float, Vector2)> GetPhase(this XElement element, float mult = 1f)
+	public static IEnumerable<Keyframe> GetPhase(this XElement element, float mult, bool hasCenter, Vector2 center)
 	{
 		var start = mult*(int.Parse(element.GetAttribute("StartFrame", ""))-1);
-		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1f, start+mult));
+		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1f, hasCenter, center, start+mult));
 		var firstkeyframenum = element.Elements("KeyFrame").First().GetIntAttribute("FrameNum");
-		if(firstkeyframenum != 0) result = result.Prepend((-1,start*Vector2.One));
+		if(firstkeyframenum != 0) result = result.Prepend(new Keyframe(-1, 0, start*Vector2.One, false, Vector2.Zero));
 		return result;
 	}
 	
-	public static (float, Vector2) GetKeyframe(this XElement element, float mult = 1f, float offset = 0)
+	public static Keyframe GetKeyframe(this XElement element, float mult, bool hasCenter, Vector2 center, float offset)
 	{
 		var frame = mult*int.Parse(element.GetAttribute("FrameNum", "")) + offset - 1;
-		var x = element.GetFloatAttribute("X");
-		var y = element.GetFloatAttribute("Y");
-		return (frame, new Vector2(x,y));
+		var pos = element.GetElementPositionOrDefault();
+		
+		if(!hasCenter)
+		{
+			hasCenter = element.HasAttribute("CenterX") || element.HasAttribute("CenterY");
+			center = element.GetElementPositionOrDefault("Center");
+		}
+		
+		return new Keyframe(frame, 0, pos, hasCenter, center);
 	}
 	
 	public static void ForEach<T>(this IEnumerable<T> enumerable, Action<T> action)
@@ -153,7 +180,7 @@ public static class Utils
 		bounds = bounds.Abs();
 		image.Resize((int)(bounds.x), (int)(bounds.y), (Image.Interpolation)4);
 		var texture = new ImageTexture();
-		texture.CreateFromImage(image, 0b11);
+		texture.CreateFromImage(image, 0b01);
 		Cache.Add((path,instanceName), texture);
 		return texture;
 	}
@@ -161,4 +188,19 @@ public static class Utils
 	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
 	
 	public static Vector2 Abs(this Vector2 v) => new Vector2(Math.Abs(v.x), Math.Abs(v.y));
+	
+	public static (float, float) RotationThing(Vector2 center, Vector2 current, Vector2 next)
+	{
+		float result1, result2;
+		
+		if(current.x == center.x) result1 = ((current.y <= center.y)?3:1) * PI_F / 2f;
+		else if(current.x < center.x) result1 = PI_F;
+		else result1 = (next.x == center.x && next.y <= center.y)?(2*PI_F):0;
+		
+		if(next.x == center.x) result2 = ((next.y <= center.y)?3:1) * PI_F / 2f;
+		else if(next.x < center.x) result2 = PI_F;
+		else result2 = (current.x == center.x && current.y <= center.y)?(2*PI_F):0;
+		
+		return (result1, result2);
+	}
 }

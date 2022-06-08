@@ -5,30 +5,31 @@ using System.Linq;
 
 public class KeyframeStepper
 {
-	public List<float> keyframes;
-	public List<Vector2> positions;
+	public List<Keyframe> keyframes;
+	public List<float> timeframes;
 	public float time;
 	public int current;
 	public float numframes;
 	
-	public KeyframeStepper(IEnumerable<(float, Vector2)> frames, Vector2 offset, float numframes)
+	public KeyframeStepper(IEnumerable<Keyframe> frames, Vector2 offset, float numframes)
 	{
 		this.numframes = numframes;
-		keyframes = new List<float>();
-		positions = new List<Vector2>();
-		
-		foreach((float key, Vector2 position) in frames)
+		keyframes = new List<Keyframe>();
+		timeframes = new List<float>();
+		foreach(var keyframe in frames)
 		{
-			var temp_key = key;
-			var temp_pos = position + offset;
+			var temp_key = keyframe.frame;
+			var temp_pos = keyframe.position + offset;
+			var temp_center = keyframe.center + offset;
 			if(temp_key == -1)
 			{
 				temp_key = temp_pos.x;
-				temp_pos = positions.Last() + offset;
+				temp_pos = keyframes.Last().position + offset;
+				temp_center = keyframes.Last().center + offset;
 			}
 			
-			keyframes.Add(temp_key);
-			positions.Add(temp_pos);
+			keyframes.Add(new Keyframe(temp_key, numframes, temp_pos, keyframe.hasCenter, temp_center));
+			timeframes.Add(temp_key);
 		}
 		
 		time = 0;
@@ -39,7 +40,7 @@ public class KeyframeStepper
 	{
 		time += t;
 		time %= numframes;
-		current = keyframes.BinarySearch(time);
+		current = timeframes.BinarySearch(time);
 		if(current < 0) current = ~current;
 		if(current == keyframes.Count) current = 0;
 	}
@@ -48,8 +49,8 @@ public class KeyframeStepper
 	{
 		var prev = current-1;
 		if(prev == -1) prev = keyframes.Count-1;
-		
-		var posdiff = positions[current]-positions[prev];
+		return keyframes[prev].StepTowards(keyframes[current], time);
+		/*var posdiff = positions[current]-positions[prev];
 		
 		var timediff = (keyframes[current]-keyframes[prev]);
 		if(timediff < 0) timediff += numframes;
@@ -64,6 +65,6 @@ public class KeyframeStepper
 		partialdiff %= numframes;
 		
 		var dist = speed*partialdiff;
-		return positions[prev]+dist;
+		return positions[prev]+dist;*/
 	}
 }
