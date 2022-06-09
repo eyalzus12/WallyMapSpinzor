@@ -11,6 +11,7 @@
 #define HIDE_MOVING_PLATFORM_TIME
 //#define GLOBALIZE_MOVING_PLATFORM_POSITION
 
+//#define HIDE_BACKGROUND
 //#define HIDE_ASSETS
 #define HIDE_PLATFORM_LABEL
 #define HIDE_ASSET_POSITION
@@ -178,9 +179,15 @@ public class LevelReader
 		{
 			#if HIDE_ASSETS
 			#else
-			//{"Background", GenerateBackgroundAction},
+			
+			#if HIDE_BACKGROUND
+			#else
+			{"Background", GenerateBackgroundAction},
+			#endif
+			
 			{"Platform", GeneratePlatformAction},
 			{"MovingPlatform", GenerateMovingPlatformAction}
+			
 			#endif
 		};
 		
@@ -585,7 +592,7 @@ public class LevelReader
 	//////////////////////////////////////////
 	////////////////Assets////////////////////
 	//////////////////////////////////////////
-	public DrawAction GenerateGenericAssetAction(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName)
+	public DrawAction GenerateGenericAssetAction(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName, string assetNameOverride = "")
 	{
 		var offset = doOffset?element.GetElementPositionOrDefault():Vector2.Zero;
 		
@@ -593,7 +600,7 @@ public class LevelReader
 		if(bounds.x < 0f) trans *= Transform2D.FlipX;
 		if(bounds.y < 0f) trans *= Transform2D.FlipY;
 		
-		var assetname = element.GetAttribute("AssetName");
+		var assetname = (assetNameOverride == "")?element.GetAttribute("AssetName"):assetNameOverride;
 		var assetpath = $"{mapArtPath}/{assetfolder}/{assetname}";
 		var texture = Utils.LoadImageFromPath(assetpath, instanceName, bounds);
 		if(texture is null) return EMPTY_ACTION;
@@ -611,7 +618,7 @@ public class LevelReader
 	}
 	
 	
-	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element, trans, true, "Backgrounds", "");
+	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
 	
 	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans)
 	{
@@ -619,8 +626,7 @@ public class LevelReader
 		
 		if(instanceName == "am_NoSkulls" || instanceName == "am_Holiday") return EMPTY_ACTION;
 		
-		var offset = element.GetElementPositionOrDefault();
-		trans = trans.Translated(offset);
+		trans = trans.Translated(element.GetElementPositionOrDefault());
 		
 		if(element.HasAttribute("Scale"))
 		{
@@ -660,11 +666,11 @@ public class LevelReader
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		trans.origin += stepper.GetCurrent();
+		trans = trans.Translated(stepper.GetCurrent());
 		
 		#if GLOBALIZE_MOVING_PLATFORM_POSITION
 		#else
-		trans.origin += element.GetElementPositionOrDefault();
+		trans = trans.Translated(element.GetElementPositionOrDefault());
 		#endif
 		
 		return element.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,trans)).Combine<CanvasItem>();

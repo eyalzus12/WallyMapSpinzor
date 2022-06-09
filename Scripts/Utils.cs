@@ -187,20 +187,5 @@ public static class Utils
 	
 	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
 	
-	public static Vector2 Abs(this Vector2 v) => new Vector2(Math.Abs(v.x), Math.Abs(v.y));
-	
-	public static (float, float) RotationThing(Vector2 center, Vector2 current, Vector2 next)
-	{
-		float result1, result2;
-		
-		if(current.x == center.x) result1 = ((current.y <= center.y)?3:1) * PI_F / 2f;
-		else if(current.x < center.x) result1 = PI_F;
-		else result1 = (next.x == center.x && next.y <= center.y)?(2*PI_F):0;
-		
-		if(next.x == center.x) result2 = ((next.y <= center.y)?3:1) * PI_F / 2f;
-		else if(next.x < center.x) result2 = PI_F;
-		else result2 = (current.x == center.x && current.y <= center.y)?(2*PI_F):0;
-		
-		return (result1, result2);
-	}
+	public static Vector2 Switch(this Vector2 v) => new Vector2(v.y, v.x);
 }
