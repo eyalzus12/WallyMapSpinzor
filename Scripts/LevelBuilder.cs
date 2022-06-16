@@ -37,7 +37,7 @@ public class LevelBuilder : Node2D
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
 		
-		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print(paused?"P":"Unp" + "aused");}
+		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
 		if(Input.IsActionJustPressed("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,2)}");}
 		if(Input.IsActionJustPressed("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,2)}");}
 	}
