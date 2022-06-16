@@ -5,11 +5,12 @@
 #define HIDE_NAVNODES
 #define HIDE_NORMALS
 #define HIDE_TRAP_POWERS
-#define HIDE_TEAM_COL
+#define HIDE_TRAP_POWER_OFFSET
+#define HIDE_TRAP_COOLDOWN
+//#define HIDE_TEAM_COL
 
 #define HIDE_MOVING_PLATFORM_POSITION
 #define HIDE_MOVING_PLATFORM_TIME
-//#define GLOBALIZE_MOVING_PLATFORM_POSITION
 
 //#define HIDE_BACKGROUND
 //#define HIDE_ASSETS
@@ -19,6 +20,9 @@
 //#define HIDE_RESPAWNS
 //#define HIDE_ITEMS
 //#define HIDE_COLLISION
+#define HIDE_ANCHORS
+
+#define HIDE_TAUNT_EVENT
 
 using Godot;
 using System;
@@ -31,11 +35,11 @@ using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, 
 
 public class LevelReader
 {
-	public const float BLASTZONE_LEFT = 100f;
-	public const float BLASTZONE_RIGHT = 100f;
-	public const float BLASTZONE_TOP = 100f;
-	public const float BLASTZONE_BOTTOM = 100f;
-	
+	public const float BLASTZONE_LEFT = 1600;
+	public const float BLASTZONE_RIGHT = 1600;
+	public const float BLASTZONE_TOP = 350;
+	public const float BLASTZONE_BOTTOM = 1000;
+	public const float START_FRAME = 0f;
 	
 	public const float DEFAULT_RADIUS = 50f;
 	public const float ANCHOR_RADIUS = 30f;
@@ -68,7 +72,7 @@ public class LevelReader
 	
 	public static readonly Color CAMERA_BOUNDS = new Color(1, 0, 0, 0.5f);
 	public static readonly Color SPAWNBOT_BOUNDS = new Color(1, 1, 0.8f, 0.5f);
-	public static readonly Color BLASTZONE_BOUNDS = new Color(0, 0, 0, 0.5f);
+	public static readonly Color BLASTZONE_BOUNDS = new Color(1, 1, 1, 1);
 	
 	public static readonly Color ITEM_SPAWN = new Color(0, 0.5f, 1, 0.5f);
 	public static readonly Color INITIAL_ITEM_SPAWN = new Color(0.5f, 0, 0.5f, 0.5f);
@@ -88,9 +92,9 @@ public class LevelReader
 	public static readonly Color GAMEMODE_SOFT_COLLISION = new Color(1, 1, 0.8f, 1);
 	public static readonly Color GAMEMODE_NOSLIDE_COLLISION = new Color(0.8f, 1, 1, 1);
 	
-	public static readonly Color BOUNCY_HARD_COLLISION = new Color(0.2f, 0.5f, 0.2f, 1);
-	public static readonly Color BOUNCY_SOFT_COLLISION = new Color(0.5f, 0.5f, 0.2f, 1);
-	public static readonly Color BOUNCY_NOSLIDE_COLLISION = new Color(0.2f, 0.5f, 0.5f, 1);
+	public static readonly Color BOUNCY_HARD_COLLISION = new Color(0.2f, 0.6f, 0.2f, 1);
+	public static readonly Color BOUNCY_SOFT_COLLISION = new Color(0.6f, 0.6f, 0.2f, 1);
+	public static readonly Color BOUNCY_NOSLIDE_COLLISION = new Color(0.2f, 0.6f, 0.6f, 1);
 	
 	public static readonly Color PRESSURE_PLATE_COLLISION = new Color(0.8f, 0.4f, 0.1f, 1);
 	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.5f, 0.1f, 0, 1);
@@ -112,12 +116,12 @@ public class LevelReader
 	
 	public static readonly Color[] GOAL_COLORS = new Color[]
 	{
-		new Color(1, 0.65f, 0, 0.1f),
-		new Color(1, 0, 0, 0.1f),
-		new Color(0, 0, 1, 0.1f),
-		new Color(0, 1, 0, 0.1f),
-		new Color(1, 1, 0, 0.1f),
-		new Color(1, 0, 1, 0.1f)
+		new Color(1, 0.65f, 0, 0.2f),
+		new Color(1, 0, 0, 0.2f),
+		new Color(0, 0, 1, 0.2f),
+		new Color(0, 1, 0, 0.2f),
+		new Color(1, 1, 0, 0.2f),
+		new Color(1, 0, 1, 0.2f)
 	};
 	
 	public static readonly Color MOVING_PLATFORM = new Color(0, 1, 0.84f, 0.3f);
@@ -141,6 +145,7 @@ public class LevelReader
 	public float defaultSlowMult;
 	public long callCount;
 	public string assetDir;
+	public bool globalizeMovingPlatformPosition = false;
 	
 	public string mapArtPath;
 	
@@ -158,19 +163,11 @@ public class LevelReader
 	public void Reset()
 	{
 		var first = document.FirstNode as XElement;
-		
 		assetDir = first.GetAttribute("AssetDir");
-		
 		callCount = 0;
-		
-		movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
+		ResetTime();
 		navnodesPositions = new Dictionary<int, Vector2>();
-		
-		
-		defaultNumFrames = first.GetIntAttribute("NumFrames", -1);
-		defaultSlowMult = first.GetFloatAttribute("SlowMult", 1f);
-		
-		first.Elements("MovingPlatform").ForEach(SetupMovingPlatform);
+		foreach(var stepper in movingPlatformsDict.Values) stepper.AdvanceTime(START_FRAME);
 	}
 	
 	public void InitGenerators()
@@ -265,11 +262,19 @@ public class LevelReader
 	
 	public DrawAction GenerateDrawAction(float timepass)
 	{
-		navnodesPositions = new Dictionary<int, Vector2>();
-		
-		foreach(var i in movingPlatformsDict.Keys) movingPlatformsDict[i].AdvanceTime(timepass);
+		if(Input.IsActionJustPressed("toggle_gloablized_moving_platform_position"))
+		{
+			globalizeMovingPlatformPosition = !globalizeMovingPlatformPosition;
+			ResetTime();
+		}
 		
 		var first = document.FirstNode as XElement;
+		
+		if(Input.IsActionJustPressed("reset_time")) ResetTime();
+		
+		navnodesPositions = new Dictionary<int, Vector2>();
+		
+		AdvanceTime(timepass);
 		
 		var assetActions = first.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,Transform2D.Identity));
 		var blastzoneaction = GenerateBlastzoneBoundsAction(first);
@@ -281,16 +286,30 @@ public class LevelReader
 		return assetActions.Append(blastzoneaction).Concat(actions).Concat(navactions).Combine<CanvasItem>();
 	}
 	
+	public void ResetTime()
+	{
+		var first = document.FirstNode as XElement;
+		movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
+		defaultNumFrames = first.GetIntAttribute("NumFrames", -1);
+		defaultSlowMult = first.GetFloatAttribute("SlowMult", 1f);
+		first.Elements("MovingPlatform").ForEach(SetupMovingPlatform);
+	}
+	
+	public void AdvanceTime(float time)
+	{
+		foreach(var i in movingPlatformsDict.Keys) movingPlatformsDict[i].AdvanceTime(time);
+	}
+		
+	
 	public IEnumerable<DrawAction> GenerateNavNodeActionList(XElement element)
 	{
 		#if HIDE_NAVNODES
+		yield break;
 		#else
 		var iterateOver = (element.Elements("DynamicNavNode").Prepend(element));
 		foreach(var e in iterateOver) foreach(var n in e.Elements("NavNode"))
 			yield return GenerateNavLineAction(n);
 		#endif
-		
-		yield break;
 	}
 	
 	public DrawAction GenerateBlastzoneBoundsAction(XElement element)
@@ -300,7 +319,13 @@ public class LevelReader
 		#else
 		var camerabounds = element.Elements("CameraBounds").First();
 		var rect = camerabounds.GetElementRect().GrowIndividual(BLASTZONE_LEFT, BLASTZONE_TOP, BLASTZONE_RIGHT, BLASTZONE_BOTTOM);
-		return (ci) => ci.DrawRect(rect, BLASTZONE_BOUNDS, false);
+		return (ci) =>
+		{
+			if(ci is Node n && Input.IsActionJustPressed("fit_blastzones"))
+				n.GetNode<NavigationCamera>("Camera").FitToRect(rect);
+			
+			ci.DrawRect(rect, BLASTZONE_BOUNDS, false);
+		};
 		#endif
 	}
 	
@@ -320,11 +345,7 @@ public class LevelReader
 		
 		var data = animationElement.GetElementKeyframes(mult, hasCenter, center);
 		
-		#if GLOBALIZE_MOVING_PLATFORM_POSITION
-		var stepper = new KeyframeStepper(data, pos, numframes*mult-1);
-		#else
-		var stepper = new KeyframeStepper(data, Vector2.Zero, numframes*mult-1);
-		#endif
+		var stepper = new KeyframeStepper(data, globalizeMovingPlatformPosition?pos:Vector2.Zero, numframes*mult-1);
 		
 		stepper.AdvanceTime(startframe*mult);
 		movingPlatformsDict.Add(platid, stepper);
@@ -428,6 +449,8 @@ public class LevelReader
 		}
 		#endif
 		
+		#if HIDE_TAUNT_EVENT
+		#else
 		if(element.HasAttribute("TauntEvent"))
 		{
 			var tauntevent = element.GetAttribute("TauntEvent");
@@ -436,7 +459,10 @@ public class LevelReader
 				(ci) => ci.DrawString(FONT, labelPos + COLLISION_TAUNT_EVENT_OFFSET*Vector2.Up, $"TauntEvent: {tauntevent}")
 			);
 		}
+		#endif
 		
+		#if HIDE_ANCHORS
+		#else
 		if(element.HasAttribute("AnchorX") && element.HasAttribute("AnchorY"))
 		{
 			var anchor = element.GetElementPosition("Anchor");
@@ -445,6 +471,7 @@ public class LevelReader
 				(ci) => ci.DrawCircle(anchor, ANCHOR_RADIUS, more_transparent)
 			);
 		}
+		#endif
 		
 		return action;
 	}
@@ -487,12 +514,21 @@ public class LevelReader
 				ci.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
 				#endif
 				
+				#if HIDE_TRAP_COOLDOWN
+				#else
 				ci.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
+				#endif
+				
+				#if HIDE_TRAP_POWER_OFFSET
+				#else
 				ci.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
 				ci.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
+				#endif
 			}
 		);
 		
+		#if HIDE_TRAP_POWER_OFFSET
+		#else
 		var lineend = firePos + dirmult*PRESSURE_PLATE_DIR_LINE_LENGTH*Vector2.Left;
 		var sideline1 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
 		var sideline2 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, -PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
@@ -505,6 +541,7 @@ public class LevelReader
 				ci.DrawLine(lineend, sideline2, PRESSURE_PLATE_LINE);
 			}
 		);
+		#endif
 		
 		return action;
 	}
@@ -601,7 +638,11 @@ public class LevelReader
 		if(bounds.y < 0f) trans *= Transform2D.FlipY;
 		
 		var assetname = (assetNameOverride == "")?element.GetAttribute("AssetName"):assetNameOverride;
-		var assetpath = $"{mapArtPath}/{assetfolder}/{assetname}";
+		var assetpath = mapArtPath + "/";
+		
+		if(assetname.StartsWith("../")) assetpath += assetname.Substring(2);
+		else assetpath += $"{assetfolder}/{assetname}";
+		
 		var texture = Utils.LoadImageFromPath(assetpath, instanceName, bounds);
 		if(texture is null) return EMPTY_ACTION;
 		return (ci) =>
@@ -628,20 +669,11 @@ public class LevelReader
 		
 		trans = trans.Translated(element.GetElementPositionOrDefault());
 		
-		if(element.HasAttribute("Scale"))
-		{
-			var scale = element.GetFloatAttribute("Scale");
-			trans.Scale *= scale;
-		}
+		trans.Scale *= element.GetFloatAttribute("Scale", 1);
+		trans.Scale *= Vector2.Right * element.GetFloatAttribute("ScaleX", 1) + Vector2.Down;
+		trans.Scale *= Vector2.Down * element.GetFloatAttribute("ScaleY", 1) + Vector2.Right;
 		
-		if(element.HasAttribute("ScaleX") && element.HasAttribute("ScaleY"))
-		{
-			var scale = element.GetElementPosition("Scale");
-			trans.Scale *= scale;
-		}
-		
-		var rot = element.GetFloatAttribute("Rotation").ToRad();
-		trans.Rotation += rot;
+		trans.Rotation += element.GetFloatAttribute("Rotation").ToRad();
 		
 		if(element.HasAttribute("AssetName"))
 		{
@@ -668,10 +700,7 @@ public class LevelReader
 		var stepper = movingPlatformsDict[platid];
 		trans = trans.Translated(stepper.GetCurrent());
 		
-		#if GLOBALIZE_MOVING_PLATFORM_POSITION
-		#else
-		trans = trans.Translated(element.GetElementPositionOrDefault());
-		#endif
+		if(!globalizeMovingPlatformPosition) trans = trans.Translated(element.GetElementPositionOrDefault());
 		
 		return element.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,trans)).Combine<CanvasItem>();
 	}
@@ -682,10 +711,7 @@ public class LevelReader
 		var stepper = movingPlatformsDict[platid];
 		var pos = stepper.GetCurrent() + offset;
 		
-		#if GLOBALIZE_MOVING_PLATFORM_POSITION
-		#else
-		pos += element.GetElementPositionOrDefault();
-		#endif
+		if(!globalizeMovingPlatformPosition) pos += element.GetElementPositionOrDefault();
 		
 		return (ci) => {
 			#if HIDE_MOVING_PLATFORM_POSITION
@@ -711,9 +737,8 @@ public class LevelReader
 		var stepper = movingPlatformsDict[platid];
 		var pos = stepper.GetCurrent() + offset;
 		
-		#if GLOBALIZE_MOVING_PLATFORM_POSITION
-		return element.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,pos)).Combine<CanvasItem>();
-		#else
+		if (globalizeMovingPlatformPosition) return element.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,pos)).Combine<CanvasItem>();
+
 		pos += element.GetElementPositionOrDefault();
 		DrawAction dynAct = (ci) => {
 			#if HIDE_MOVING_PLATFORM_POSITION
@@ -728,12 +753,10 @@ public class LevelReader
 			#endif
 		};
 		return element.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,pos)).Append(dynAct).Combine<CanvasItem>();
-		#endif
 	}
 	
 	public DrawAction GenerateDynamicCollisionAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
 	public DrawAction GenerateDynamicRespawnAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
 	public DrawAction GenerateDynamicItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
 	public DrawAction GenerateDynamicNavNodeAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
-	
 }

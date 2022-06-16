@@ -50,21 +50,5 @@ public class KeyframeStepper
 		var prev = current-1;
 		if(prev == -1) prev = keyframes.Count-1;
 		return keyframes[prev].StepTowards(keyframes[current], time);
-		/*var posdiff = positions[current]-positions[prev];
-		
-		var timediff = (keyframes[current]-keyframes[prev]);
-		if(timediff < 0) timediff += numframes;
-		timediff %= numframes;
-		
-		if(timediff == 0) return positions[prev];
-		
-		var speed = posdiff/timediff;
-		
-		var partialdiff = time-keyframes[prev];
-		if(partialdiff < 0) partialdiff += numframes;
-		partialdiff %= numframes;
-		
-		var dist = speed*partialdiff;
-		return positions[prev]+dist;*/
 	}
 }

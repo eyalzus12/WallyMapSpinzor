@@ -177,8 +177,10 @@ public static class Utils
 		
 		if(bounds.x == 0f) bounds.x = image.GetWidth();
 		if(bounds.y == 0f) bounds.y = image.GetHeight();
+		
 		bounds = bounds.Abs();
-		image.Resize((int)(bounds.x), (int)(bounds.y), (Image.Interpolation)4);
+		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)4);
+		
 		var texture = new ImageTexture();
 		texture.CreateFromImage(image, 0b01);
 		Cache.Add((path,instanceName), texture);
@@ -188,4 +190,9 @@ public static class Utils
 	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
 	
 	public static Vector2 Switch(this Vector2 v) => new Vector2(v.y, v.x);
+	
+	public static Vector2 Center(this Rect2 rec) => new Vector2(
+		rec.Position.x + rec.Size.x / 2,
+		rec.Position.y + rec.Size.y / 2
+	);
 }

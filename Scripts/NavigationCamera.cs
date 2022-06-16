@@ -30,4 +30,11 @@ public class NavigationCamera : Camera2D
 		var zoomy = Math.Max(MAXZOOM_IN, Math.Min(Zoom.y, MAXZOOM_OUT));
 		Zoom = new Vector2(zoomx, zoomy);
 	}
+	
+	public void FitToRect(Rect2 rect)
+	{
+		Offset = rect.Center();
+		var cameraZoomXY = rect.Size/GetViewportRect().Size;
+		Zoom = (Math.Max(cameraZoomXY.x, cameraZoomXY.y) + 0.01f)*Vector2.One;
+	}
 }
