@@ -6,9 +6,10 @@ using System.Linq;
 
 public static class Utils
 {
-	public const float PI_F = (float)Math.PI;
-	
 	public static Dictionary<(string, string), ImageTexture> Cache = new Dictionary<(string, string), ImageTexture>();
+	
+	public static string GetSubElementValue(this XElement element, string elementValue, string @default = "") => element.Element(elementValue)?.Value ?? @default;
+	public static float GetFloatSubElementValue(this XElement element, string elementValue, float @default = 0f) => float.Parse(element.GetSubElementValue(elementValue, $"{@default}"));
 	
 	public static bool HasAttribute(this XElement element, string attribute) => (element.Attributes(attribute).Count() > 0);
 	
@@ -30,13 +31,11 @@ public static class Utils
 		return int.Parse(element.GetAttribute(attribute));
 	}
 	
-	
-	public static float GetFloatAttribute(this XElement element, string attribute, float @default = 0f)
+	public static float GetFloatAttribute(this XElement element, string attribute, float @default = 0)
 	{
 		if(!element.HasAttribute(attribute)) return @default;
 		return float.Parse(element.GetAttribute(attribute));
 	}
-	
 	
 	public static Vector2 GetElementPosition(this XElement element, string prefix = "")
 	{
@@ -123,7 +122,7 @@ public static class Utils
 			switch(anmelem.Name.LocalName)
 			{
 				case "KeyFrame":
-					yield return anmelem.GetKeyframe(mult, hasCenter, center, 0f);
+					yield return anmelem.GetKeyframe(mult, hasCenter, center, 0);
 					break;
 				case "Phase":
 					foreach(var h in anmelem.GetPhase(mult, hasCenter, center)) yield return h;
@@ -135,7 +134,7 @@ public static class Utils
 	public static IEnumerable<Keyframe> GetPhase(this XElement element, float mult, bool hasCenter, Vector2 center)
 	{
 		var start = mult*(int.Parse(element.GetAttribute("StartFrame", ""))-1);
-		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1f, hasCenter, center, start+mult));
+		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1, hasCenter, center, start+mult));
 		var firstkeyframenum = element.Elements("KeyFrame").First().GetIntAttribute("FrameNum");
 		if(firstkeyframenum != 0) result = result.Prepend(new Keyframe(-1, 0, start*Vector2.One, false, Vector2.Zero));
 		return result;
@@ -182,7 +181,7 @@ public static class Utils
 		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)4);
 		
 		var texture = new ImageTexture();
-		texture.CreateFromImage(image, 0b01);
+		texture.CreateFromImage(image, 0b001);
 		Cache.Add((path,instanceName), texture);
 		return texture;
 	}

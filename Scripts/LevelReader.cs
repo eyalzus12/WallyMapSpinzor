@@ -35,12 +35,6 @@ using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, 
 
 public class LevelReader
 {
-	public const float BLASTZONE_LEFT = 1600;
-	public const float BLASTZONE_RIGHT = 1600;
-	public const float BLASTZONE_TOP = 350;
-	public const float BLASTZONE_BOTTOM = 1000;
-	public const float START_FRAME = 0f;
-	
 	public const float DEFAULT_RADIUS = 50f;
 	public const float ANCHOR_RADIUS = 30f;
 	public const float FIRE_OFFSET_RADIUS = 10f;
@@ -136,38 +130,80 @@ public class LevelReader
 		{"W", new Color(1, 1, 0, 0.3f)}
 	};
 	
-	public XDocument document;
+	public XDocument parsedMapFile;
+	public XDocument parsedLevelTypes;
+	
 	public Dictionary<string, Generator> generators;
 	public Dictionary<string, AssetGenerator> assetGenerators;
 	public Dictionary<int, KeyframeStepper> movingPlatformsDict;
 	public Dictionary<int, Vector2> navnodesPositions;
+	
 	public int defaultNumFrames;
 	public float defaultSlowMult;
+	
+	public float blastzoneLeft;
+	public float blastzoneRight;
+	public float blastzoneTop;
+	public float blastzoneBottom;
+	public float globalStartFrame;
+	
 	public long callCount;
 	public string assetDir;
-	public bool globalizeMovingPlatformPosition = false;
 	
+	public bool globalizeMovingPlatformPosition = false;
+	public bool noSkulls = false;
+	
+	public string mapFolder;
+	public string mapName;
+	public string levelTypesPath;
 	public string mapArtPath;
 	
 	public LevelReader() {}
 	
-	public LevelReader(string filepath, string mapart)
+	public LevelReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath)
 	{
-		mapArtPath = mapart;
-		var content = Read(filepath);
-		document = XDocument.Parse(content);
+		SetupReader(mapFolder, mapName, levelTypesPath, mapArtPath);
+	}
+	
+	public void SetupReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath)
+	{
+		this.mapFolder = mapFolder;
+		this.mapName = mapName;
+		this.levelTypesPath = levelTypesPath;
+		this.mapArtPath = mapArtPath;
+		
+		parsedMapFile = XDocument.Parse(Read($"{mapFolder}/{mapName}.xml"));
+		parsedLevelTypes = XDocument.Parse(Read(levelTypesPath));
 		InitGenerators();
 		Reset();
 	}
 	
 	public void Reset()
 	{
-		var first = document.FirstNode as XElement;
-		assetDir = first.GetAttribute("AssetDir");
 		callCount = 0;
+		
+		var firstMap = parsedMapFile.FirstNode as XElement;
+		var firstLevelTypes = parsedLevelTypes.FirstNode as XElement;
+		
+		assetDir = firstMap.GetAttribute("AssetDir");
+		
+		var levelTypeElement = firstLevelTypes
+									.Elements("LevelType")
+									.Where(e => e.GetAttribute("LevelName", "") == mapName)
+									.First();
+		
+		blastzoneLeft = levelTypeElement.GetFloatSubElementValue("LeftKill", 0);
+		blastzoneRight = levelTypeElement.GetFloatSubElementValue("RightKill", 0);
+		blastzoneTop = levelTypeElement.GetFloatSubElementValue("TopKill", 0);
+		blastzoneBottom = levelTypeElement.GetFloatSubElementValue("BottomKill", 0);
+		globalStartFrame = levelTypeElement.GetFloatSubElementValue("StartFrame", 0);
+		
+		defaultNumFrames = firstMap.GetIntAttribute("NumFrames", -1);
+		defaultSlowMult = firstMap.GetFloatAttribute("SlowMult", 1f);
+		
 		ResetTime();
 		navnodesPositions = new Dictionary<int, Vector2>();
-		foreach(var stepper in movingPlatformsDict.Values) stepper.AdvanceTime(START_FRAME);
+		foreach(var stepper in movingPlatformsDict.Values) stepper.AdvanceTime(globalStartFrame);
 	}
 	
 	public void InitGenerators()
@@ -268,7 +304,7 @@ public class LevelReader
 			ResetTime();
 		}
 		
-		var first = document.FirstNode as XElement;
+		if(Input.IsActionJustPressed("toggle_no_skulls")) noSkulls = !noSkulls;
 		
 		if(Input.IsActionJustPressed("reset_time")) ResetTime();
 		
@@ -276,6 +312,7 @@ public class LevelReader
 		
 		AdvanceTime(timepass);
 		
+		var first = parsedMapFile.FirstNode as XElement;
 		var assetActions = first.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,Transform2D.Identity));
 		var blastzoneaction = GenerateBlastzoneBoundsAction(first);
 		var actions = first.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,Vector2.Zero));
@@ -288,11 +325,8 @@ public class LevelReader
 	
 	public void ResetTime()
 	{
-		var first = document.FirstNode as XElement;
 		movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
-		defaultNumFrames = first.GetIntAttribute("NumFrames", -1);
-		defaultSlowMult = first.GetFloatAttribute("SlowMult", 1f);
-		first.Elements("MovingPlatform").ForEach(SetupMovingPlatform);
+		(parsedMapFile.FirstNode as XElement).Elements("MovingPlatform").ForEach(SetupMovingPlatform);
 	}
 	
 	public void AdvanceTime(float time)
@@ -318,7 +352,7 @@ public class LevelReader
 		return EMPTY_ACTION
 		#else
 		var camerabounds = element.Elements("CameraBounds").First();
-		var rect = camerabounds.GetElementRect().GrowIndividual(BLASTZONE_LEFT, BLASTZONE_TOP, BLASTZONE_RIGHT, BLASTZONE_BOTTOM);
+		var rect = camerabounds.GetElementRect().GrowIndividual(blastzoneLeft, blastzoneTop, blastzoneRight, blastzoneBottom);
 		return (ci) =>
 		{
 			if(ci is Node n && Input.IsActionJustPressed("fit_blastzones"))
@@ -347,7 +381,7 @@ public class LevelReader
 		
 		var stepper = new KeyframeStepper(data, globalizeMovingPlatformPosition?pos:Vector2.Zero, numframes*mult-1);
 		
-		stepper.AdvanceTime(startframe*mult);
+		stepper.AdvanceTime(startframe*mult + globalStartFrame);
 		movingPlatformsDict.Add(platid, stepper);
 	}
 	
@@ -638,13 +672,19 @@ public class LevelReader
 		if(bounds.y < 0f) trans *= Transform2D.FlipY;
 		
 		var assetname = (assetNameOverride == "")?element.GetAttribute("AssetName"):assetNameOverride;
-		var assetpath = mapArtPath + "/";
 		
-		if(assetname.StartsWith("../")) assetpath += assetname.Substring(2);
-		else assetpath += $"{assetfolder}/{assetname}";
+		var assetpath = assetname.StartsWith("../") ?
+		assetname.Substring("../".Length) :
+		$"{assetfolder}/{assetname}";
 		
-		var texture = Utils.LoadImageFromPath(assetpath, instanceName, bounds);
-		if(texture is null) return EMPTY_ACTION;
+		var texture = Utils.LoadImageFromPath($"{mapArtPath}/{assetpath}", instanceName, bounds);
+		
+		if(
+			texture is null ||
+			(!noSkulls && instanceName == "am_NoSkulls") ||
+			(instanceName == "am_Holiday")
+		) return EMPTY_ACTION;
+		
 		return (ci) =>
 		{
 			#if HIDE_ASSET_POSITION
@@ -658,14 +698,15 @@ public class LevelReader
 		};
 	}
 	
-	
-	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
+	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans)
+	{
+		if(noSkulls && element.GetBooleanAttribute("HasSkulls", false)) return EMPTY_ACTION;
+		return GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
+	}
 	
 	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans)
 	{
 		var instanceName = element.GetAttribute("InstanceName");
-		
-		if(instanceName == "am_NoSkulls" || instanceName == "am_Holiday") return EMPTY_ACTION;
 		
 		trans = trans.Translated(element.GetElementPositionOrDefault());
 		

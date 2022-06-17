@@ -8,22 +8,32 @@ public class LevelBuilder : Node2D
 	//the path to the folder containing the maps
 	public const string MAP_FOLDER = "C:/Users/eyalz/Desktop/scripts/bh dump/Dynamic";
 	//the name of the map file
-	public const string MAP_NAME = "BigTitansEnd";
+	public const string MAP_NAME = "BigShipwreckFalls";
+	
+	//the path to the level types file
+	public const string LEVEL_TYPES = "C:/Users/eyalz/Desktop/scripts/bh dump/Init/LevelTypes.xml";
+	
 	//the path to the mapArt folder
 	public const string MAPART_FOLDER = "C:/Users/eyalz/Desktop/scripts/mapArt";
+	
 	//the path to output screenshots to
 	public const string SCREENSHOT_FOLDER = "C:/Users/eyalz/Desktop/scripts/bh dump/Renders";
+	
+	
 	//initial speed of the moving platforms
 	public float speed = 0.05f;
 	//how much to increase or decrease speed by
 	public const float SPEED_INC = 0.01f;
+	//how much to round output by. keep as -log_10(SPEED_INC) for best results
+	public const int ROUND_SPEED = 2;
+	
 	
 	public bool paused = false;
 	public LevelReader levelreader;
 	
 	public override void _Ready()
 	{
-		levelreader = new LevelReader($"{MAP_FOLDER}/{MAP_NAME}.xml", MAPART_FOLDER);
+		levelreader = new LevelReader(MAP_FOLDER, MAP_NAME, LEVEL_TYPES, MAPART_FOLDER);
 	}
 	
 	public override void _PhysicsProcess(float delta)
@@ -38,8 +48,8 @@ public class LevelBuilder : Node2D
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
 		
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
-		if(Input.IsActionJustPressed("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,2)}");}
-		if(Input.IsActionJustPressed("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,2)}");}
+		if(Input.IsActionJustPressed("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,ROUND_SPEED)}");}
+		if(Input.IsActionJustPressed("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,ROUND_SPEED)}");}
 	}
 	
 	public void TakeScreenshot()
