@@ -8,7 +8,7 @@ public class LevelBuilder : Node2D
 	//the path to the folder containing the maps
 	public const string MAP_FOLDER = "C:/Users/eyalz/Desktop/scripts/bh dump/Dynamic";
 	//the name of the map file
-	public const string MAP_NAME = "BigShipwreckFalls";
+	public const string MAP_NAME = "BigEnigma";
 	
 	//the path to the level types file
 	public const string LEVEL_TYPES = "C:/Users/eyalz/Desktop/scripts/bh dump/Init/LevelTypes.xml";
@@ -24,11 +24,19 @@ public class LevelBuilder : Node2D
 	public float speed = 0.05f;
 	//how much to increase or decrease speed by
 	public const float SPEED_INC = 0.01f;
-	//how much to round output by. keep as -log_10(SPEED_INC) for best results
-	public const int ROUND_SPEED = 2;
+	public static readonly int roundSpeed = -(int)Math.Log10(Math.Abs(SPEED_INC - Math.Truncate(SPEED_INC)));
 	
-	
+	public bool precise = false;
 	public bool paused = false;
+	
+	public Func<string, bool> inputChecker
+	{
+		get
+		{
+			if(precise) return s => Input.IsActionJustPressed(s); else return s => Input.IsActionPressed(s);
+		}
+	}
+	
 	public LevelReader levelreader;
 	
 	public override void _Ready()
@@ -46,10 +54,11 @@ public class LevelBuilder : Node2D
 		if(Input.IsActionJustPressed("toggle_fullscreen")) OS.WindowFullscreen = !OS.WindowFullscreen;
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
-		
+		if(Input.IsActionJustPressed("toggle_precision")) precise = !precise;
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
-		if(Input.IsActionJustPressed("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,ROUND_SPEED)}");}
-		if(Input.IsActionJustPressed("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,ROUND_SPEED)}");}
+		
+		if(inputChecker("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
 	}
 	
 	public void TakeScreenshot()
@@ -65,7 +74,7 @@ public class LevelBuilder : Node2D
 	
 	public override void _Draw()
 	{
-		var mult = Input.IsActionJustPressed("forward_once")?1:Input.IsActionJustPressed("back_once")?-1:paused?0:1;
+		var mult = inputChecker("forward_once")?1:inputChecker("back_once")?-1:paused?0:1;
 		levelreader.GenerateDrawAction(mult*speed)(this);
 	}
 }
