@@ -39,6 +39,7 @@ public class KeyframeStepper
 	public void AdvanceTime(float t)
 	{
 		time += t;
+		while(time < 0) time += numframes;
 		time %= numframes;
 		current = timeframes.BinarySearch(time);
 		if(current < 0) current = ~current;

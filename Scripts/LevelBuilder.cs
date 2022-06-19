@@ -29,13 +29,7 @@ public class LevelBuilder : Node2D
 	public bool precise = false;
 	public bool paused = false;
 	
-	public Func<string, bool> inputChecker
-	{
-		get
-		{
-			if(precise) return s => Input.IsActionJustPressed(s); else return s => Input.IsActionPressed(s);
-		}
-	}
+	public Func<string, bool> inputChecker => s => precise?Input.IsActionJustPressed(s):Input.IsActionPressed(s);
 	
 	public LevelReader levelreader;
 	
