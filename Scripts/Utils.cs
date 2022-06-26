@@ -6,6 +6,14 @@ using System.Linq;
 
 public static class Utils
 {
+	public const bool filter = false;
+	public const bool mipmap = false;
+	public const bool repeat = true;
+	
+	public static uint Filter => (filter)?0b100:0;
+	public static uint Mipmap => (mipmap)?0b010:0;
+	public static uint Repeat => (filter)?0b001:0;
+	
 	public static Dictionary<(string, string), ImageTexture> Cache = new Dictionary<(string, string), ImageTexture>();
 	
 	public static string GetSubElementValue(this XElement element, string elementValue, string @default = "") => element.Element(elementValue)?.Value ?? @default;
@@ -105,42 +113,34 @@ public static class Utils
 		return new Rect2(pos.x, pos.y, bounds.x, bounds.y);
 	}
 	
-	public static Action<T> Chain<T>(this Action<T> a, Action<T> b)
-	{
-		return (T t) => {a(t); b(t);};
-	}
+	public static Action<T> Chain<T>(this Action<T> a, Action<T> b) => (t) => {a(t); b(t);};
+	public static Action<object> Chain(this Action<object> a, Action<object> b) => a.Chain<object>(b);
+	public static Action<T> Combine<T>(this IEnumerable<Action<T>> e) => (t) => e.ForEach(a => a(t));
+	public static Action<object> Combine(this IEnumerable<Action<object>> e) => e.Combine<object>();
+	public static T Identity<T>(T t) => t;
+	public static object Identity(object o) => Identity<object>(o);
 	
-	public static Action<T> Combine<T>(this IEnumerable<Action<T>> e)
-	{
-		return (T t) => {foreach(var a in e) a(t);};
-	}
-	
-	public static IEnumerable<Keyframe> GetElementKeyframes(this XElement element, float mult, bool hasCenter, Vector2 center)
-	{
-		foreach(var anmelem in element.Elements())
-		{
-			switch(anmelem.Name.LocalName)
+	public static IEnumerable<Keyframe> GetElementKeyframes(this XElement element, float mult, bool hasCenter, Vector2 center) => 
+		element.Elements().SelectMany(a => {
+			switch(a.Name.LocalName)
 			{
-				case "KeyFrame":
-					yield return anmelem.GetKeyframe(mult, hasCenter, center, 0);
-					break;
-				case "Phase":
-					foreach(var h in anmelem.GetPhase(mult, hasCenter, center)) yield return h;
-					break;
+				case "KeyFrame": return a.GetKeyframe(mult, hasCenter, center, 0);
+				case "Phase": return a.GetPhase(mult, hasCenter, center);
+				default: return null;
 			}
 		}
-	}
+	);
 	
 	public static IEnumerable<Keyframe> GetPhase(this XElement element, float mult, bool hasCenter, Vector2 center)
 	{
 		var start = mult*(int.Parse(element.GetAttribute("StartFrame", ""))-1);
-		var result = element.Elements("KeyFrame").Select((k) => k.GetKeyframe(1, hasCenter, center, start+mult));
+		var result = element.Elements("KeyFrame").SelectMany((k) => k.GetKeyframe(1, hasCenter, center, start+mult));
 		var firstkeyframenum = element.Elements("KeyFrame").First().GetIntAttribute("FrameNum");
 		if(firstkeyframenum != 0) result = result.Prepend(new Keyframe(-1, 0, start*Vector2.One, false, Vector2.Zero));
 		return result;
 	}
 	
-	public static Keyframe GetKeyframe(this XElement element, float mult, bool hasCenter, Vector2 center, float offset)
+	public static IEnumerable<Keyframe> GetKeyframe(this XElement element, float mult, bool hasCenter, Vector2 center, float offset)
 	{
 		var frame = mult*int.Parse(element.GetAttribute("FrameNum", "")) + offset - 1;
 		var pos = element.GetElementPositionOrDefault();
@@ -151,7 +151,7 @@ public static class Utils
 			center = element.GetElementPositionOrDefault("Center");
 		}
 		
-		return new Keyframe(frame, 0, pos, hasCenter, center);
+		yield return new Keyframe(frame, 0, pos, hasCenter, center);//IEnumerable to make main function cleaner
 	}
 	
 	public static void ForEach<T>(this IEnumerable<T> enumerable, Action<T> action)
@@ -181,7 +181,7 @@ public static class Utils
 		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)4);
 		
 		var texture = new ImageTexture();
-		texture.CreateFromImage(image, 0b001);
+		texture.CreateFromImage(image, Filter | Mipmap | Repeat);
 		Cache.Add((path,instanceName), texture);
 		return texture;
 	}

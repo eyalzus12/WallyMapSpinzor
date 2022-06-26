@@ -8,17 +8,17 @@ public class LevelBuilder : Node2D
 	//the path to the folder containing the maps
 	public const string MAP_FOLDER = "C:/Users/eyalz/Desktop/scripts/bh dump/Dynamic";
 	//the name of the map file
-	public const string MAP_NAME = "BigEnigma";
+	public const string MAP_NAME = "Fangwild";
 	
 	//the path to the level types file
+	//make empty string to not load anything
 	public const string LEVEL_TYPES = "C:/Users/eyalz/Desktop/scripts/bh dump/Init/LevelTypes.xml";
 	
 	//the path to the mapArt folder
 	public const string MAPART_FOLDER = "C:/Users/eyalz/Desktop/scripts/mapArt";
 	
 	//the path to output screenshots to
-	public const string SCREENSHOT_FOLDER = "C:/Users/eyalz/Desktop/scripts/bh dump/Renders";
-	
+	public const string SCREENSHOT_FOLDER = "C:/Users/eyalz/Desktop/scripts/Renders";
 	
 	//initial speed of the moving platforms
 	public float speed = 0.05f;
