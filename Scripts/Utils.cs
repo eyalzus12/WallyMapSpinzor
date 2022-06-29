@@ -9,6 +9,7 @@ public static class Utils
 	public const bool filter = false;
 	public const bool mipmap = false;
 	public const bool repeat = true;
+	public const int interpol = 4;//choose in range [1,4]. higher number- better result
 	
 	public static uint Filter => (filter)?0b100:0;
 	public static uint Mipmap => (mipmap)?0b010:0;
@@ -161,15 +162,20 @@ public static class Utils
 	
 	public static void ForEach(this IEnumerable<object> enumerable, Action<object> action) => enumerable.ForEach<object>(action);
 	
+	public static void Finalize<T>(this IEnumerable<T> enumerable) => enumerable.ForEach<T>((t) => {});
+	public static void Finalize(this IEnumerable<object> enumerable) => enumerable.Finalize<object>();
+	
 	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds)
 	{
 		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];
+		
+		GD.Print($"Loading {path}" + ((instanceName == "")?"":$" with instance {instanceName}"));
 		
 		var image = new Image();
 		var er = image.Load(path);
 		if(er != Error.Ok) 
 		{
-			GD.Print($"Got error {er} while attempting to load image from path {path}");
+			//GD.Print($"Got error {er} while attempting to load image from path {path}");
 			Cache.Add((path,instanceName), null);
 			return null;
 		}
@@ -178,7 +184,7 @@ public static class Utils
 		if(bounds.y == 0f) bounds.y = image.GetHeight();
 		
 		bounds = bounds.Abs();
-		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)4);
+		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)interpol);
 		
 		var texture = new ImageTexture();
 		texture.CreateFromImage(image, Filter | Mipmap | Repeat);
@@ -194,4 +200,14 @@ public static class Utils
 		rec.Position.x + rec.Size.x / 2,
 		rec.Position.y + rec.Size.y / 2
 	);
+	
+	public static string Read(string filepath)
+	{
+		var f = new File();//create new file
+		var er = f.Open(filepath, File.ModeFlags.Read);//open file
+		if(er != Error.Ok) throw new ArgumentException($"Error {er} while reading file {filepath}");
+		var content = f.GetAsText();//read text
+		f.Close();//flush buffer
+		return content;
+	}
 }

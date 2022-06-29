@@ -2,7 +2,6 @@
 //#define SHOW_SPAWNBOT_BOUNDS
 #define SHOW_BLASTZONE_BOUNDS
 
-//#define SHOW_NAVNODES
 //#define SHOW_NAVMESH
 
 //#define SHOW_MOVING_PLATFORM_POSITION
@@ -50,8 +49,9 @@ public class LevelReader
 	public const float MOVING_PLATFORM_RADIUS = 10f;
 	public const float NAVNODE_RADIUS = 10f;
 	public const float NORMAL_LENGTH = 50f;
+	public const float ASSET_POSITION_RADIUS = 10f;
 	
-	public const float TEAM_LINES_OFFSET = 5f;
+	public const float TEAM_LINES_OFFSET = 4f;
 	
 	public const float PRESSURE_PLATE_POWERS_OFFSET = 50f;
 	public const float PRESSURE_PLATE_COOLDOWN_OFFSET = -50f;
@@ -109,12 +109,12 @@ public class LevelReader
 	
 	public static readonly Color[] TEAM_COLLISION = new Color[]
 	{
-		new Color(1, 0.65f, 0, 1),
-		new Color(1, 0, 0, 1),
-		new Color(0, 0, 1, 1),
-		new Color(0, 1, 0, 1),
-		new Color(1, 1, 0, 1),
-		new Color(1, 0, 1, 1)
+		new Color(1, 0.65f, 0, 0.5f),
+		new Color(1, 0, 0, 0.5f),
+		new Color(0, 0, 1, 0.5f),
+		new Color(0, 1, 0, 0.5f),
+		new Color(1, 1, 0, 0.5f),
+		new Color(1, 0, 1, 0.5f)
 	};
 	
 	public static readonly Color[] GOAL_COLORS = new Color[]
@@ -128,6 +128,8 @@ public class LevelReader
 	};
 	
 	public static readonly Color MOVING_PLATFORM = new Color(0, 1, 0.84f, 0.3f);
+	
+	public static readonly Color ASSET = new Color(0, 0, 0);
 	
 	public static readonly Dictionary<string, Color> NAVNODE_COLORS = new Dictionary<string, Color>
 	{
@@ -163,33 +165,59 @@ public class LevelReader
 	public bool noSkulls = false;
 	
 	public string mapFolder;
+	public string swfPath;
 	public string mapName;
 	public string levelTypesPath;
 	public string mapArtPath;
 	
+	public int redCount = 0;
+	public int blueCount = 0;
+	
 	public LevelReader() {}
 	
-	public LevelReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath)
+	public LevelReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath, string swfPath)
 	{
-		SetupReader(mapFolder, mapName, levelTypesPath, mapArtPath);
+		SetupReader(mapFolder, mapName, levelTypesPath, mapArtPath, swfPath);
 	}
 	
-	public void SetupReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath)
+	public void SetupReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath, string swfPath)
 	{
 		this.mapFolder = mapFolder;
 		this.mapName = mapName;
 		this.levelTypesPath = levelTypesPath;
 		this.mapArtPath = mapArtPath;
+		this.swfPath = swfPath;
 		
-		parsedMapFile = XDocument.Parse(Read($"{mapFolder}/{mapName}.xml"));
-		parsedLevelTypes = (levelTypesPath == "")?null:XDocument.Parse(Read(levelTypesPath));
+		parsedMapFile = XDocument.Parse(Utils.Read($"{mapFolder}/{mapName}.xml"));
+		parsedLevelTypes = (levelTypesPath == "")?null:XDocument.Parse(Utils.Read(levelTypesPath));
+		
 		InitGenerators();
 		Reset();
+		LoadAssets();
+	}
+	
+	public void LoadAssets()
+	{
+		var first = parsedMapFile?.FirstNode as XElement;
+		
+		//load all normal assets
+		first.Elements()
+			.Where(HasAssetGenerator)
+			.Select(InvokeAssetGenerator)
+			.Combine()(null);
+		
+		//load all scoreboard assets
+		first.Elements("TeamScoreboard")
+			.SelectMany(e => Enumerable.Range(0, 10)
+			.Select(i => GenerateScoreboardAction(e, Transform2D.Identity, i, i)))
+			.Combine()(null);
 	}
 	
 	public void Reset()
 	{
 		callCount = 0;
+		redCount = 0;
+		blueCount = 0;
 		
 		var firstMap = parsedMapFile.FirstNode as XElement;
 		assetDir = firstMap.GetAttribute("AssetDir");
@@ -227,7 +255,7 @@ public class LevelReader
 			#endif
 			
 			{"Platform", GeneratePlatformAction},
-			{"MovingPlatform", GenerateMovingPlatformAction}
+			{"MovingPlatform", GenerateMovingPlatformAction},
 			
 			#endif
 		};
@@ -277,7 +305,7 @@ public class LevelReader
 			
 			{"MovingPlatform", GenerateSecondaryMovingPlatformAction},
 			
-			#if SHOW_NAVNODES
+			#if SHOW_NAVMESH
 			{"NavNode", GenerateNavNodeAction},
 			{"DynamicNavNode", GenerateDynamicNavNodeAction},
 			#endif
@@ -290,18 +318,17 @@ public class LevelReader
 		};
 	}
 	
-	public string Read(string filepath)
-	{
-		var f = new File();//create new file
-		var er = f.Open(filepath, File.ModeFlags.Read);//open file
-		if(er != Error.Ok) throw new ArgumentException($"Error {er} while reading file {filepath}");
-		var content = f.GetAsText();//read text
-		f.Close();//flush buffer
-		return content;
-	}
 	
-	public Generator GetGenerator(string s) => (generators.ContainsKey(s))?(generators[s]):EMPTY_GENERATOR;
-	public AssetGenerator GetAssetGenerator(string s) => (assetGenerators.ContainsKey(s))?(assetGenerators[s]):EMPTY_ASSET_GENERATOR;
+	public bool HasGenerator(string s) => generators.ContainsKey(s);
+	public bool HasGenerator(XElement e) => HasGenerator(e.Name.LocalName);
+	public Generator GetGenerator(string s) => generators[s];
+	public Generator GetGenerator(XElement e) => GetGenerator(e.Name.LocalName);
+	public DrawAction InvokeGenerator(XElement e) => GetGenerator(e)(e, Vector2.Zero);
+	public bool HasAssetGenerator(string s) => assetGenerators.ContainsKey(s);
+	public bool HasAssetGenerator(XElement e) => HasAssetGenerator(e.Name.LocalName);
+	public AssetGenerator GetAssetGenerator(string s) => assetGenerators[s];
+	public AssetGenerator GetAssetGenerator(XElement e) => GetAssetGenerator(e.Name.LocalName);
+	public DrawAction InvokeAssetGenerator(XElement e) => GetAssetGenerator(e)(e, Transform2D.Identity);
 	
 	public DrawAction GenerateDrawAction(float timepass)
 	{
@@ -324,20 +351,33 @@ public class LevelReader
 		return (ci) =>
 		{
 			#if SHOW_ASSETS
-			first.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,Transform2D.Identity)).Combine()(ci);
+			
+			first.Elements()
+				.Where(HasAssetGenerator)
+				.Select(InvokeAssetGenerator)
+				.Combine()(ci);
+			
+			first
+				.Elements("TeamScoreboard")
+				.Select(e => GenerateScoreboardAction(e, Transform2D.Identity, redCount, blueCount))
+				.Combine()(ci);
 			#endif
 			
 			#if SHOW_SPECIAL
-			first.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,Vector2.Zero)).Combine()(ci);
+			
+			first.Elements()
+				.Where(HasGenerator)
+				.Select(InvokeGenerator)
+				.Combine()(ci);
+			
 			#endif
 			
 			#if SHOW_NAVMESH
 			GenerateNavMeshActionList(first).Combine()(ci);
 			#endif
 			
-			#if SHOW_BLASTZONE_BOUNDS
+			
 			GenerateBlastzoneBoundsAction(first)(ci);
-			#endif
 			
 			callCount++;
 		};
@@ -351,12 +391,17 @@ public class LevelReader
 	
 	public void AdvanceTime(float time) => movingPlatformsDict.Values.ForEach(s => s.AdvanceTime(time));
 	
-	public IEnumerable<DrawAction> GenerateNavMeshActionList(XElement element) => element.Elements("DynamicNavNode").Prepend(element).SelectMany(e => e.Elements("NavNode")).Select(GenerateNavLineAction);
+	public IEnumerable<DrawAction> GenerateNavMeshActionList(XElement element) =>
+		element.Elements("DynamicNavNode")
+			.Prepend(element)
+			.SelectMany(e => e.Elements("NavNode"))
+			.Select(GenerateNavLineAction);
 	
 	public DrawAction GenerateBlastzoneBoundsAction(XElement element)
 	{
 		var camerabounds = element.Elements("CameraBounds").First().GetElementRect();
 		var rect = camerabounds.GrowIndividual(blastzoneLeft, blastzoneTop, blastzoneRight, blastzoneBottom);
+		
 		return (ci) =>
 		{
 			if(ci is Node n)
@@ -367,10 +412,9 @@ public class LevelReader
 			}
 			
 			#if SHOW_BLASTZONE_BOUNDS
-			ci.DrawRect(rect, BLASTZONE_BOUNDS, false);
+			ci?.DrawRect(rect, BLASTZONE_BOUNDS, false);
 			#endif
 		};
-		
 	}
 	
 	public void SetupMovingPlatform(XElement element)
@@ -402,7 +446,7 @@ public class LevelReader
 	{
 		var rect = element.GetElementRect();
 		rect.Position += offset;
-		return (ci) => ci.DrawRect(rect, color, false);
+		return (ci) => ci?.DrawRect(rect, color, false);
 	}
 	
 	public DrawAction GenerateCameraBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, CAMERA_BOUNDS);
@@ -418,12 +462,12 @@ public class LevelReader
 		if(rect.Size.x == 0 && rect.Size.y == 0)
 		{
 			var newrect = new Rect2(rect.Position - DEFAULT_RADIUS*Vector2.One, 2f*DEFAULT_RADIUS*Vector2.One);
-			return (ci) => ci.DrawRect(newrect, color, false);
+			return (ci) => ci?.DrawRect(newrect, color, false);
 		}
 		else if(rect.Size.x == 0 || rect.Size.y == 0)
-			return (ci) => ci.DrawLine(rect.Position, rect.End, color);
+			return (ci) => ci?.DrawLine(rect.Position, rect.End, color);
 		else
-			return (ci) => ci.DrawRect(rect, color, true);
+			return (ci) => ci?.DrawRect(rect, color, true);
 	}
 	
 	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, ITEM_SPAWN);
@@ -445,7 +489,7 @@ public class LevelReader
 		
 		var pos = element.GetElementPosition();
 		pos += offset;
-		return (ci) => ci.DrawCircle(pos, DEFAULT_RADIUS, chosenColor);
+		return (ci) => ci?.DrawCircle(pos, DEFAULT_RADIUS, chosenColor);
 	}
 	
 	//////////////////////////////////////////
@@ -468,10 +512,10 @@ public class LevelReader
 		
 		DrawAction action = (ci) =>
 		{
-			ci.DrawLine(@from, to, color);
+			ci?.DrawLine(@from, to, color);
 			
 			#if SHOW_NORMALS
-			ci.DrawLine(normal_start, normal_end, NORMAL_LINE);
+			ci?.DrawLine(normal_start, normal_end, NORMAL_LINE);
 			#endif
 		};
 		
@@ -483,8 +527,8 @@ public class LevelReader
 			action = action.Chain(
 				(ci) =>
 				{
-					ci.DrawLine(@from+teamoffset, to+teamoffset, TEAM_COLLISION[team]);
-					ci.DrawLine(@from-teamoffset, to-teamoffset, TEAM_COLLISION[team]);
+					ci?.DrawLine(@from+teamoffset, to+teamoffset, TEAM_COLLISION[team]);
+					ci?.DrawLine(@from-teamoffset, to-teamoffset, TEAM_COLLISION[team]);
 				}
 			);
 		}
@@ -496,7 +540,7 @@ public class LevelReader
 			var tauntevent = element.GetAttribute("TauntEvent");
 			var labelPos = new Vector2(Math.Min(@from.x, to.x), Math.Min(@from.y, to.y));
 			action = action.Chain(
-				(ci) => ci.DrawString(FONT, labelPos + COLLISION_TAUNT_EVENT_OFFSET*Vector2.Up, $"TauntEvent: {tauntevent}")
+				(ci) => ci?.DrawString(FONT, labelPos + COLLISION_TAUNT_EVENT_OFFSET*Vector2.Up, $"TauntEvent: {tauntevent}")
 			);
 		}
 		#endif
@@ -507,7 +551,7 @@ public class LevelReader
 			var anchor = element.GetElementPosition("Anchor");
 			var more_transparent = new Color(color.r, color.g, color.b, 0.3f);
 			action = action.Chain(
-				(ci) => ci.DrawCircle(anchor, ANCHOR_RADIUS, more_transparent)
+				(ci) => ci?.DrawCircle(anchor, ANCHOR_RADIUS, more_transparent)
 			);
 		}
 		#endif
@@ -549,16 +593,16 @@ public class LevelReader
 			(ci) =>
 			{
 				#if SHOW_TRAP_POWERS
-				ci.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
+				ci?.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
 				#endif
 				
 				#if SHOW_TRAP_COOLDOWN
-				ci.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
+				ci?.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
 				#endif
 				
 				#if SHOW_TRAP_POWER_OFFSET
-				ci.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
-				ci.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
+				ci?.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
+				ci?.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
 				#endif
 			}
 		);
@@ -571,9 +615,9 @@ public class LevelReader
 		action = action.Chain(
 			(ci) =>
 			{
-				ci.DrawLine(firePos, lineend, PRESSURE_PLATE_LINE);
-				ci.DrawLine(lineend, sideline1, PRESSURE_PLATE_LINE);
-				ci.DrawLine(lineend, sideline2, PRESSURE_PLATE_LINE);
+				ci?.DrawLine(firePos, lineend, PRESSURE_PLATE_LINE);
+				ci?.DrawLine(lineend, sideline1, PRESSURE_PLATE_LINE);
+				ci?.DrawLine(lineend, sideline2, PRESSURE_PLATE_LINE);
 			}
 		);
 		#endif
@@ -606,8 +650,8 @@ public class LevelReader
 		navnodesPositions.Add(id, pos);
 		return (ci) =>
 		{
-			ci.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[type]);
-			ci.DrawString(FONT, pos + NAVNODE_ID_OFFSET*Vector2.Up, $"NavID: {navid}");
+			ci?.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[type]);
+			ci?.DrawString(FONT, pos + NAVNODE_ID_OFFSET*Vector2.Up, $"NavID: {navid}");
 		};
 	}
 	
@@ -640,7 +684,7 @@ public class LevelReader
 						return EMPTY_ACTION;
 					}
 					
-					return (ci) => ci.DrawLine(pos, (pos+navnodesPositions[norms])/2f, NAVNODE_COLORS[types]);
+					return (ci) => ci?.DrawLine(pos, (pos+navnodesPositions[norms])/2f, NAVNODE_COLORS[types]);
 				}
 		).Combine();
 	}
@@ -675,31 +719,35 @@ public class LevelReader
 		assetname.Substring("../".Length) :
 		$"{assetfolder}/{assetname}";
 		
-		var texture = Utils.LoadImageFromPath($"{mapArtPath}/{assetpath}", instanceName, bounds);
+		var hasSkulls = element.GetBooleanAttribute("HasSkulls", false);
+		
+		return GenerateBaseAssetAction(trans, offset, $"{mapArtPath}/{assetpath}", instanceName, bounds, hasSkulls);
+	}
+	
+	public DrawAction GenerateBaseAssetAction(Transform2D trans, Vector2 offset, string path, string instanceName, Vector2 bounds, bool hasSkulls = false)
+	{
+		var texture = Utils.LoadImageFromPath(path, instanceName, bounds);
 		
 		if(
 			texture is null ||
 			(!noSkulls && instanceName == "am_NoSkulls") ||
+			(noSkulls && hasSkulls) ||
 			(instanceName == "am_Holiday")
 		) return EMPTY_ACTION;
 		
 		return (ci) =>
 		{
 			#if SHOW_ASSET_POSITION
-			ci.DrawCircle(offset, 10f, new Color(0,0,0,1));
+			ci?.DrawCircle(offset, ASSET_POSITION_RADIUS, ASSET);
 			#endif
 			
-			ci.DrawSetTransformMatrix(trans);
-			ci.DrawTexture(texture, offset);
-			ci.DrawSetTransformMatrix(Transform2D.Identity);
+			ci?.DrawSetTransformMatrix(trans);
+			ci?.DrawTexture(texture, offset);
+			ci?.DrawSetTransformMatrix(Transform2D.Identity);
 		};
 	}
 	
-	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans)
-	{
-		if(noSkulls && element.GetBooleanAttribute("HasSkulls", false)) return EMPTY_ACTION;
-		return GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
-	}
+	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
 	
 	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans)
 	{
@@ -715,12 +763,16 @@ public class LevelReader
 		
 		if(!element.HasAttribute("AssetName"))
 		{
-			var assetActions = element.Elements("Asset").Select(e => GenerateGenericAssetAction(e, trans, true, assetDir, instanceName));
-			var platformActions = element.Elements("Platform").Select(e => GeneratePlatformAction(e, trans));
+			var assetActions = element.Elements("Asset")
+									.Select(e => GenerateGenericAssetAction(e, trans, true, assetDir, instanceName));
+			
+			var platformActions = element.Elements("Platform")
+										.Select(e => GeneratePlatformAction(e, trans));
+			
 			var actions = assetActions.Concat(platformActions);
 			
 			#if SHOW_PLATFORM_LABEL
-			actions = actions.Append((ci) => ci.DrawString(FONT, trans.origin, $"InstanceName: {instanceName}"));
+			actions = actions.Append((ci) => ci?.DrawString(FONT, trans.origin, $"InstanceName: {instanceName}"));
 			#endif
 			
 			return actions.Combine();
@@ -736,7 +788,10 @@ public class LevelReader
 		
 		if(!globalizeMovingPlatformPosition) trans = trans.Translated(element.GetElementPositionOrDefault());
 		
-		return element.Elements().Select(e => GetAssetGenerator(e.Name.LocalName)(e,trans)).Combine();
+		return element.Elements()
+					.Where(HasAssetGenerator)
+					.Select(e => GetAssetGenerator(e)(e,trans))
+					.Combine();
 	}
 	
 	public DrawAction GenerateSecondaryMovingPlatformAction(XElement element, Vector2 offset)
@@ -750,12 +805,65 @@ public class LevelReader
 		return (ci) => {
 			#if SHOW_MOVING_PLATFORM_POSITION
 				#if SHOW_MOVING_PLATFORM_TIME
-					ci.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
+					ci?.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
 				#endif
 				
-				ci.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
-				ci.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
+				ci?.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
+				ci?.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
 			#endif
+		};
+	}
+	
+	public DrawAction GenerateScoreboardAction(XElement element, Transform2D trans, int redCount, int blueCount)
+	{
+		var redX = element.GetFloatAttribute("RedTeamX");
+		var blueX = element.GetFloatAttribute("BlueTeamX");
+		var y = element.GetFloatAttribute("Y");
+		var oneDigitX = element.GetFloatAttribute("DoubleDigitsOnesX");
+		var tenDigitX = element.GetFloatAttribute("DoubleDigitsTensX");
+		var digitYDiff = element.GetFloatAttribute("DoubleDigitsY")-y;
+		var digitScale = element.GetFloatAttribute("DoubleDigitsScale");
+		
+		var redOne = (redCount%10)/1;
+		var redTen = (redCount%100)/10;
+		
+		var blueOne = (blueCount%10)/1;
+		var blueTen = (blueCount%100)/10;
+		
+		var redDouble = (redTen != 0);
+		var blueDouble = (blueTen != 0);
+		
+		var redOneDigit = new Vector2(redDouble?oneDigitX:0, redDouble?digitYDiff:0);
+		var redTenDigit = new Vector2(tenDigitX, digitYDiff);
+		var blueOneDigit = new Vector2(blueDouble?oneDigitX:0, blueDouble?digitYDiff:0);
+		var blueTenDigit = new Vector2(tenDigitX, digitYDiff);
+		
+		var redTrans = trans.Translated(new Vector2(redX, y));
+		var blueTrans = trans.Translated(new Vector2(blueX, y));
+		
+		if(!redDouble) blueTrans.Scale /= digitScale;
+		if(!blueDouble) redTrans.Scale /= digitScale;
+		
+		var redFont = element.GetAttribute("RedDigitFont");
+		var blueFont = element.GetAttribute("BlueDigitFont");
+		
+		var redOneName = $"Digit{redOne}_{redFont}.png";
+		var redTenName = $"Digit{redTen}_{redFont}.png";
+		
+		var blueOneName = $"Digit{blueOne}_{blueFont}.png";
+		var blueTenName = $"Digit{blueTen}_{blueFont}.png";
+		
+		return (ci) =>
+		{
+			GenerateBaseAssetAction(redTrans, redOneDigit, $"{swfPath}/{redOneName}", "", Vector2.Zero)(ci);
+			
+			if(redDouble)
+				GenerateBaseAssetAction(redTrans, redTenDigit, $"{swfPath}/{redTenName}", "", Vector2.Zero)(ci);
+			
+			GenerateBaseAssetAction(blueTrans, blueOneDigit, $"{swfPath}/{blueOneName}", "", Vector2.Zero)(ci);
+			
+			if(blueDouble)
+				GenerateBaseAssetAction(blueTrans, blueTenDigit, $"{swfPath}/{blueTenName}", "", Vector2.Zero)(ci);
 		};
 	}
 	
@@ -769,20 +877,27 @@ public class LevelReader
 		var stepper = movingPlatformsDict[platid];
 		var pos = stepper.GetCurrent() + offset;
 		
-		if(globalizeMovingPlatformPosition) return element.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,pos)).Combine();
+		if(globalizeMovingPlatformPosition)
+			return element.Elements()
+						.Where(HasGenerator)
+						.Select(e => GetGenerator(e)(e,pos))
+						.Combine();
 		
 		pos += element.GetElementPositionOrDefault();
 		DrawAction dynAct = (ci) => {
 			#if SHOW_MOVING_PLATFORM_POSITION
 				#if SHOW_MOVING_PLATFORM_TIME
-					ci.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
+					ci?.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
 				#endif
 				
-				ci.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
-				ci.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
+				ci?.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
+				ci?.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
 			#endif
 		};
-		return element.Elements().Select(e => GetGenerator(e.Name.LocalName)(e,pos)).Append(dynAct).Combine();
+		return element.Elements()
+					.Select(e => GetGenerator(e.Name.LocalName)(e,pos))
+					.Append(dynAct)
+					.Combine();
 	}
 	
 	public DrawAction GenerateDynamicCollisionAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
