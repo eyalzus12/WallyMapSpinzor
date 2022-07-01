@@ -43,7 +43,8 @@ using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, 
 
 public class LevelReader
 {
-	public const float DEFAULT_RADIUS = 50f;
+	public const float DEFAULT_AREA_RADIUS = 30f;
+	public const float RESPAWN_RADIUS = 30f;
 	public const float ANCHOR_RADIUS = 30f;
 	public const float FIRE_OFFSET_RADIUS = 10f;
 	public const float MOVING_PLATFORM_RADIUS = 10f;
@@ -461,7 +462,7 @@ public class LevelReader
 		rect.Position += offset;
 		if(rect.Size.x == 0 && rect.Size.y == 0)
 		{
-			var newrect = new Rect2(rect.Position - DEFAULT_RADIUS*Vector2.One, 2f*DEFAULT_RADIUS*Vector2.One);
+			var newrect = new Rect2(rect.Position - DEFAULT_AREA_RADIUS*Vector2.One, 2f*DEFAULT_AREA_RADIUS*Vector2.One);
 			return (ci) => ci?.DrawRect(newrect, color, false);
 		}
 		else if(rect.Size.x == 0 || rect.Size.y == 0)
@@ -489,7 +490,7 @@ public class LevelReader
 		
 		var pos = element.GetElementPosition();
 		pos += offset;
-		return (ci) => ci?.DrawCircle(pos, DEFAULT_RADIUS, chosenColor);
+		return (ci) => ci?.DrawCircle(pos, RESPAWN_RADIUS, chosenColor);
 	}
 	
 	//////////////////////////////////////////
@@ -502,13 +503,11 @@ public class LevelReader
 		var dir = (to-@from).Normalized();
 		var clockwise_dir = new Vector2(-dir.y, dir.x);
 		
-		#if SHOW_NORMALS
 		var normal = clockwise_dir;
 		if(element.HasAttribute("NormalX")) normal.x = element.GetFloatAttribute("NormalX");
 		if(element.HasAttribute("NormalY")) normal.y = element.GetFloatAttribute("NormalY");
 		var normal_start = (@from+to)/2f;
 		var normal_end = normal_start + NORMAL_LENGTH * normal;
-		#endif
 		
 		DrawAction action = (ci) =>
 		{
