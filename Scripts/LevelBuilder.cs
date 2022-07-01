@@ -43,6 +43,12 @@ public class LevelBuilder : Node2D
 	
 	public override void _PhysicsProcess(float delta)
 	{
+		if(Input.IsActionJustPressed("toggle_precision")) precise = !precise;
+		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
+		
+		if(inputChecker("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		
 		Update();
 	}
 	
@@ -51,11 +57,6 @@ public class LevelBuilder : Node2D
 		if(Input.IsActionJustPressed("toggle_fullscreen")) OS.WindowFullscreen = !OS.WindowFullscreen;
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
-		if(Input.IsActionJustPressed("toggle_precision")) precise = !precise;
-		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
-		
-		if(inputChecker("increase_speed")) {speed += SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
-		if(inputChecker("decrease_speed")) {speed -= SPEED_INC; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
 	}
 	
 	public void TakeScreenshot()
