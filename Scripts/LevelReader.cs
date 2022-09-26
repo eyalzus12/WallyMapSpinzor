@@ -1,37 +1,3 @@
-#define SHOW_CAMERA_BOUNDS
-//#define SHOW_SPAWNBOT_BOUNDS
-#define SHOW_BLASTZONE_BOUNDS
-
-//#define SHOW_NAVMESH
-
-//#define SHOW_MOVING_PLATFORM_POSITION
-	#define SHOW_MOVING_PLATFORM_TIME
-
-#define SHOW_ASSETS
-	#define SHOW_BACKGROUND
-	//#define SHOW_PLATFORM_LABEL
-	//#define SHOW_ASSET_POSITION
-
-#define SHOW_SPECIAL
-	#define SHOW_RESPAWNS
-	
-	#define SHOW_ITEMS
-	
-	#define SHOW_COLLISION
-		#define SHOW_TEAM_COL
-		
-		//#define SHOW_ANCHORS
-		
-		//#define SHOW_NORMALS
-		
-		//#define SHOW_TRAP_POWERS
-		//#define SHOW_TRAP_POWER_OFFSET
-		//#define SHOW_TRAP_COOLDOWN
-		
-		//#define SHOW_TAUNT_EVENT
-	
-	#define SHOW_GOALS
-
 using Godot;
 using System;
 using System.Xml.Linq;
@@ -43,104 +9,9 @@ using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, 
 
 public class LevelReader
 {
-	public const float DEFAULT_AREA_RADIUS = 30f;
-	public const float RESPAWN_RADIUS = 30f;
-	public const float ANCHOR_RADIUS = 30f;
-	public const float FIRE_OFFSET_RADIUS = 10f;
-	public const float MOVING_PLATFORM_RADIUS = 10f;
-	public const float NAVNODE_RADIUS = 10f;
-	public const float NORMAL_LENGTH = 50f;
-	public const float ASSET_POSITION_RADIUS = 10f;
-	
-	public const float TEAM_LINES_OFFSET = 4f;
-	
-	public const float PRESSURE_PLATE_POWERS_OFFSET = 50f;
-	public const float PRESSURE_PLATE_COOLDOWN_OFFSET = -50f;
-	
-	public const float COLLISION_TAUNT_EVENT_OFFSET = 60f;
-	
-	public const float MOVING_PLATFORM_TIME_OFFSET = 45f;
-	public const float MOVING_PLATFORM_PLATID_OFFSET = 10f;
-	
-	public const float NAVNODE_ID_OFFSET = 10f;
-	
-	public const float PRESSURE_PLATE_DIR_LINE_LENGTH = 50f;
-	public const float PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X = 10f;
-	public const float PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y = 10f;
-	
-	public static readonly Font FONT = ResourceLoader.Load<Font>("res://BrawlhallaFont.tres");
-	
 	public static readonly DrawAction EMPTY_ACTION = (ci) => {};
 	public static readonly Generator EMPTY_GENERATOR = (ci, offset) => EMPTY_ACTION;
 	public static readonly AssetGenerator EMPTY_ASSET_GENERATOR = (ci, trans) => EMPTY_ACTION;
-	
-	public static readonly Color CAMERA_BOUNDS = new Color(1, 0, 0, 0.5f);
-	public static readonly Color SPAWNBOT_BOUNDS = new Color(1, 1, 0.8f, 0.5f);
-	public static readonly Color BLASTZONE_BOUNDS = new Color(1, 1, 1, 1);
-	
-	public static readonly Color ITEM_SPAWN = new Color(0, 0.5f, 1, 0.5f);
-	public static readonly Color INITIAL_ITEM_SPAWN = new Color(0.5f, 0, 0.5f, 0.5f);
-	public static readonly Color ITEM_SET = new Color(0, 0, 0.5f, 0.5f);
-	
-	
-	public static readonly Color RESPAWN = new Color(1, 0.5f, 0, 0.5f);
-	public static readonly Color INITIAL_RESPAWN = new Color(1, 0, 0, 0.5f);
-	public static readonly Color EXPANDED_INITIAL_RESPAWN = new Color(1, 0, 1, 0.5f);
-	
-	
-	public static readonly Color HARD_COLLISION = new Color(0, 1, 0, 1);
-	public static readonly Color SOFT_COLLISION = new Color(1, 1, 0, 1);
-	public static readonly Color NOSLIDE_COLLISION = new Color(0, 1, 1, 1);
-	
-	public static readonly Color GAMEMODE_HARD_COLLISION = new Color(0.8f, 1, 0.8f, 1);
-	public static readonly Color GAMEMODE_SOFT_COLLISION = new Color(1, 1, 0.8f, 1);
-	public static readonly Color GAMEMODE_NOSLIDE_COLLISION = new Color(0.8f, 1, 1, 1);
-	
-	public static readonly Color BOUNCY_HARD_COLLISION = new Color(0.2f, 0.6f, 0.2f, 1);
-	public static readonly Color BOUNCY_SOFT_COLLISION = new Color(0.6f, 0.6f, 0.2f, 1);
-	public static readonly Color BOUNCY_NOSLIDE_COLLISION = new Color(0.2f, 0.6f, 0.6f, 1);
-	
-	public static readonly Color PRESSURE_PLATE_COLLISION = new Color(0.8f, 0.4f, 0.1f, 1);
-	public static readonly Color SOFT_PRESSURE_PLATE_COLLISION = new Color(0.5f, 0.1f, 0, 1);
-	
-	public static readonly Color PRESSURE_PLATE_LINE = new Color(1,0.5f,0,1);
-	public static readonly Color PRESSURE_PLATE_FIRE_OFFSET = new Color(1,0.1f,0,0.3f);
-	
-	public static readonly Color NORMAL_LINE = new Color(0.9f,0.9f,0.9f,0.5f);
-	
-	public static readonly Color[] TEAM_COLLISION = new Color[]
-	{
-		new Color(1, 0.65f, 0, 0.5f),
-		new Color(1, 0, 0, 0.5f),
-		new Color(0, 0, 1, 0.5f),
-		new Color(0, 1, 0, 0.5f),
-		new Color(1, 1, 0, 0.5f),
-		new Color(1, 0, 1, 0.5f)
-	};
-	
-	public static readonly Color[] GOAL_COLORS = new Color[]
-	{
-		new Color(1, 0.65f, 0, 0.2f),
-		new Color(1, 0, 0, 0.2f),
-		new Color(0, 0, 1, 0.2f),
-		new Color(0, 1, 0, 0.2f),
-		new Color(1, 1, 0, 0.2f),
-		new Color(1, 0, 1, 0.2f)
-	};
-	
-	public static readonly Color MOVING_PLATFORM = new Color(0, 1, 0.84f, 0.3f);
-	
-	public static readonly Color ASSET = new Color(0, 0, 0);
-	
-	public static readonly Dictionary<string, Color> NAVNODE_COLORS = new Dictionary<string, Color>
-	{
-		{"", new Color(0.5f, 0.5f, 0.5f, 0.3f)},
-		{"A", new Color(0, 0, 1, 0.3f)},
-		{"D", new Color(1, 0, 0, 0.3f)},
-		{"G", new Color(1, 0.647f, 0, 0.3f)},
-		{"L", new Color(0, 1, 0, 0.3f)},
-		{"W", new Color(1, 1, 0, 0.3f)}
-	};
 	
 	public XDocument parsedMapFile;
 	public XDocument parsedLevelTypes;
@@ -174,20 +45,26 @@ public class LevelReader
 	public int redCount = 0;
 	public int blueCount = 0;
 	
+	public ConfigReader cf;
+	
+	public Font font;
+	
 	public LevelReader() {}
 	
-	public LevelReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath, string swfPath)
+	public LevelReader(ConfigReader configReader)
 	{
-		SetupReader(mapFolder, mapName, levelTypesPath, mapArtPath, swfPath);
+		this.cf = configReader;
+		SetupReader();
 	}
 	
-	public void SetupReader(string mapFolder, string mapName, string levelTypesPath, string mapArtPath, string swfPath)
+	public void SetupReader()
 	{
-		this.mapFolder = mapFolder;
-		this.mapName = mapName;
-		this.levelTypesPath = levelTypesPath;
-		this.mapArtPath = mapArtPath;
-		this.swfPath = swfPath;
+		mapFolder = cf.Paths["LevelsFolder"];
+		mapName = cf.Paths["LevelName"];;
+		levelTypesPath = cf.Paths["LevelTypes"];
+		mapArtPath = cf.Paths["MapArt"];
+		swfPath = cf.Paths["SWFReplacement"];
+		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
 		
 		parsedMapFile = XDocument.Parse(Utils.Read($"{mapFolder}/{mapName}.xml"));
 		parsedLevelTypes = (levelTypesPath == "")?null:XDocument.Parse(Utils.Read(levelTypesPath));
@@ -217,8 +94,10 @@ public class LevelReader
 	public void Reset()
 	{
 		callCount = 0;
-		redCount = 0;
-		blueCount = 0;
+		redCount = Convert.ToInt32(cf.Others["RedScore"]);
+		blueCount = Convert.ToInt32(cf.Others["BlueScore"]);
+		globalizeMovingPlatformPosition = Convert.ToBoolean(cf.Others["GalvanPrimeFix"]);
+		noSkulls = Convert.ToBoolean(cf.Others["NoSkulls"]);
 		
 		var firstMap = parsedMapFile.FirstNode as XElement;
 		assetDir = firstMap.GetAttribute("AssetDir");
@@ -247,76 +126,66 @@ public class LevelReader
 	
 	public void InitGenerators()
 	{
-		assetGenerators = new Dictionary<string, AssetGenerator>()
+		assetGenerators = new Dictionary<string, AssetGenerator>();
+		if(cf.Display["Assets"])
 		{
-			#if SHOW_ASSETS
-			
-			#if SHOW_BACKGROUND
-			{"Background", GenerateBackgroundAction},
-			#endif
-			
-			{"Platform", GeneratePlatformAction},
-			{"MovingPlatform", GenerateMovingPlatformAction},
-			
-			#endif
-		};
+			if(cf.Display["Background"]) assetGenerators.Add("Background", GenerateBackgroundAction);
+			assetGenerators.Add("Platform", GeneratePlatformAction);
+			assetGenerators.Add("MovingPlatform", GenerateMovingPlatformAction);
+		}
 		
-		generators = new Dictionary<string, Generator>()
+		generators = new Dictionary<string, Generator>();
+		
+		if(cf.Display["Bounds"])
 		{
-			#if SHOW_SPECIAL
+			if(cf.Display["CameraBounds"]) generators.Add("CameraBounds", GenerateCameraBoundsAction);
+			if(cf.Display["SpawnbotBounds"]) generators.Add("SpawnBotBounds", GenerateSpawnBotBoundsAction);
+		}
+		
+		if(cf.Display["Items"])
+		{
+			generators.Add("ItemSpawn", GenerateItemSpawnAction);
+			generators.Add("ItemInitSpawn", GenerateInitialItemSpawnAction);
+			generators.Add("ItemSet", GenerateItemSetAction);
+			generators.Add("DynamicItemSpawn", GenerateDynamicItemSpawnAction);
+		}
+		
+		if(cf.Display["Respawns"])
+		{
+			generators.Add("Respawn", GenerateRespawnAction);
+			generators.Add("DynamicRespawn", GenerateDynamicRespawnAction);
+		}
+		
+		if(cf.Display["Collision"])
+		{
+			generators.Add("HardCollision", GenerateHardCollisionAction);
+			generators.Add("SoftCollision", GenerateSoftCollisionAction);
+			generators.Add("NoSlideCollision", GenerateNoSlideCollisionAction);
 			
-			#if SHOW_CAMERA_BOUNDS
-			{"CameraBounds", GenerateCameraBoundsAction},
-			#endif
+			generators.Add("GameModeHardCollision", GenerateGamemodeHardCollisionAction);
+			generators.Add("GameModeSoftCollision", GenerateGamemodeSoftCollisionAction);
+			generators.Add("GameModeNoSlideCollision", GenerateGamemodeNoSlideCollisionAction);
 			
-			#if SHOW_SPAWNBOT_BOUNDS
-			{"SpawnBotBounds", GenerateSpawnBotBoundsAction},
-			#endif
+			generators.Add("BouncyHardCollision", GenerateBouncyHardCollisionAction);
+			generators.Add("BouncySoftCollision", GenerateBouncySoftCollisionAction);
+			generators.Add("BouncyNoSlideCollision", GenerateBouncyNoSlideCollisionAction);
 			
-			#if SHOW_ITEMS
-			{"ItemSpawn", GenerateItemSpawnAction},
-			{"ItemInitSpawn", GenerateInitialItemSpawnAction},
-			{"ItemSet", GenerateItemSetAction},
-			{"DynamicItemSpawn", GenerateDynamicItemSpawnAction},
-			#endif
+			generators.Add("PressurePlateCollision", GeneratePressurePlateCollisionAction);
+			generators.Add("SoftPressurePlateCollision", GenerateSoftPressurePlateCollisionAction);
 			
-			#if SHOW_RESPAWNS
-			{"Respawn", GenerateRespawnAction},
-			{"DynamicRespawn", GenerateDynamicRespawnAction},
-			#endif
-			
-			#if SHOW_COLLISION
-			{"HardCollision", GenerateHardCollisionAction},
-			{"SoftCollision", GenerateSoftCollisionAction},
-			{"NoSlideCollision", GenerateNoSlideCollisionAction},
-			
-			{"GameModeHardCollision", GenerateGamemodeHardCollisionAction},
-			{"GameModeSoftCollision", GenerateGamemodeSoftCollisionAction},
-			{"GameModeNoSlideCollision", GenerateGamemodeNoSlideCollisionAction},
-			
-			{"BouncyHardCollision", GenerateBouncyHardCollisionAction},
-			{"BouncySoftCollision", GenerateBouncySoftCollisionAction},
-			{"BouncyNoSlideCollision", GenerateBouncyNoSlideCollisionAction},
-			
-			{"PressurePlateCollision", GeneratePressurePlateCollisionAction},
-			{"SoftPressurePlateCollision", GenerateSoftPressurePlateCollisionAction},
-			
-			{"DynamicCollision", GenerateDynamicCollisionAction},
-			#endif
-			
-			{"MovingPlatform", GenerateSecondaryMovingPlatformAction},
-			
-			#if SHOW_NAVMESH
-			{"NavNode", GenerateNavNodeAction},
-			{"DynamicNavNode", GenerateDynamicNavNodeAction},
-			#endif
-			
-			#if SHOW_GOALS
-			{"Goal", GenerateGoalAction},
-			#endif
-			
-			#endif
-		};
+			generators.Add("DynamicCollision", GenerateDynamicCollisionAction);
+		}
+		
+		if(cf.Display["MovingPlatformData"])
+		generators.Add("MovingPlatform", GenerateSecondaryMovingPlatformAction);
+		
+		if(cf.Display["Navmesh"])
+		{
+			generators.Add("NavNode", GenerateNavNodeAction);
+			generators.Add("DynamicNavNode", GenerateDynamicNavNodeAction);
+		}
+		
+		if(cf.Display["Goals"]) generators.Add("Goal", GenerateGoalAction);
 	}
 	
 	
@@ -351,31 +220,28 @@ public class LevelReader
 		
 		return (ci) =>
 		{
-			#if SHOW_ASSETS
-			
-			first.Elements()
+			if(cf.Display["Assets"])
+			{
+				first.Elements()
 				.Where(HasAssetGenerator)
 				.Select(InvokeAssetGenerator)
 				.Combine()(ci);
-			
-			first
-				.Elements("TeamScoreboard")
-				.Select(e => GenerateScoreboardAction(e, Transform2D.Identity, redCount, blueCount))
-				.Combine()(ci);
-			#endif
-			
-			#if SHOW_SPECIAL
+				
+				if(cf.Display["ScoreboardDigits"])
+				first
+					.Elements("TeamScoreboard")
+					.Select(e => GenerateScoreboardAction(e, Transform2D.Identity, redCount, blueCount))
+					.Combine()(ci);
+				
+			}
 			
 			first.Elements()
 				.Where(HasGenerator)
 				.Select(InvokeGenerator)
 				.Combine()(ci);
 			
-			#endif
-			
-			#if SHOW_NAVMESH
-			GenerateNavMeshActionList(first).Combine()(ci);
-			#endif
+			if(cf.Display["Navmesh"])
+				GenerateNavMeshActionList(first).Combine()(ci);
 			
 			
 			GenerateBlastzoneBoundsAction(first)(ci);
@@ -412,9 +278,8 @@ public class LevelReader
 				if(Input.IsActionJustPressed("fit_blastzones")) navcam.FitToRect(rect);
 			}
 			
-			#if SHOW_BLASTZONE_BOUNDS
-			ci?.DrawRect(rect, BLASTZONE_BOUNDS, false);
-			#endif
+			if(cf.Display["Bounds"] && cf.Display["BlastzoneBounds"])
+				ci?.DrawRect(rect, cf.Colors["BlastzoneBounds"], false);
 		};
 	}
 	
@@ -450,8 +315,8 @@ public class LevelReader
 		return (ci) => ci?.DrawRect(rect, color, false);
 	}
 	
-	public DrawAction GenerateCameraBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, CAMERA_BOUNDS);
-	public DrawAction GenerateSpawnBotBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, SPAWNBOT_BOUNDS);
+	public DrawAction GenerateCameraBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, cf.Colors["CameraBounds"]);
+	public DrawAction GenerateSpawnBotBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, cf.Colors["SpawnbotBounds"]);
 	
 	//////////////////////////////////////////
 	///////////////Item Spawns////////////////
@@ -462,7 +327,8 @@ public class LevelReader
 		rect.Position += offset;
 		if(rect.Size.x == 0 && rect.Size.y == 0)
 		{
-			var newrect = new Rect2(rect.Position - DEFAULT_AREA_RADIUS*Vector2.One, 2f*DEFAULT_AREA_RADIUS*Vector2.One);
+			var rad = cf.Sizes["DefaultAreaRadius"];
+			var newrect = new Rect2(rect.Position - rad*Vector2.One, 2f*rad*Vector2.One);
 			return (ci) => ci?.DrawRect(newrect, color, false);
 		}
 		else if(rect.Size.x == 0 || rect.Size.y == 0)
@@ -471,9 +337,9 @@ public class LevelReader
 			return (ci) => ci?.DrawRect(rect, color, true);
 	}
 	
-	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, ITEM_SPAWN);
-	public DrawAction GenerateInitialItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, INITIAL_ITEM_SPAWN);
-	public DrawAction GenerateItemSetAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, ITEM_SET);
+	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSpawn"]);
+	public DrawAction GenerateInitialItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["InitialItemSpawn"]);
+	public DrawAction GenerateItemSetAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSet"]);
 	
 	//////////////////////////////////////////
 	/////////////////Respawns/////////////////
@@ -484,13 +350,13 @@ public class LevelReader
 		var expandedInit = element.GetBooleanAttribute("ExpandedInit");
 		
 		Color chosenColor;
-		if(initial) chosenColor = INITIAL_RESPAWN;
-		else if(expandedInit) chosenColor = EXPANDED_INITIAL_RESPAWN;
-		else chosenColor = RESPAWN;
+		if(initial) chosenColor = cf.Colors["InitialRespawn"];
+		else if(expandedInit) chosenColor = cf.Colors["ExtendedInitialRespawn"];
+		else chosenColor = cf.Colors["Respawn"];
 		
 		var pos = element.GetElementPosition();
 		pos += offset;
-		return (ci) => ci?.DrawCircle(pos, RESPAWN_RADIUS, chosenColor);
+		return (ci) => ci?.DrawCircle(pos, cf.Sizes["RespawnRadius"], chosenColor);
 	}
 	
 	//////////////////////////////////////////
@@ -507,70 +373,61 @@ public class LevelReader
 		if(element.HasAttribute("NormalX")) normal.x = element.GetFloatAttribute("NormalX");
 		if(element.HasAttribute("NormalY")) normal.y = element.GetFloatAttribute("NormalY");
 		var normal_start = (@from+to)/2f;
-		var normal_end = normal_start + NORMAL_LENGTH * normal;
+		var normal_end = normal_start + cf.Sizes["NormalLength"] * normal;
 		
-		DrawAction action = (ci) =>
-		{
-			ci?.DrawLine(@from, to, color);
-			
-			#if SHOW_NORMALS
-			ci?.DrawLine(normal_start, normal_end, NORMAL_LINE);
-			#endif
-		};
+		DrawAction action = (ci) => ci?.DrawLine(@from, to, color);
 		
-		#if SHOW_TEAM_COL
-		if(element.HasAttribute("Team"))
+		if(cf.Display["CollisionNormals"])
+			action = action.Chain((ci) => ci?.DrawLine(normal_start, normal_end, cf.Colors["NormalLine"]));
+		
+		if(cf.Display["TeamCollision"] && element.HasAttribute("Team"))
 		{
-			var teamoffset = TEAM_LINES_OFFSET * clockwise_dir;
+			var teamoffset = cf.Sizes["TeamLinesOffset"] * clockwise_dir;
 			var team = element.GetIntAttribute("Team");
+			var teamcolor = cf.Colors[$"TeamColor{team}"];
 			action = action.Chain(
 				(ci) =>
 				{
-					ci?.DrawLine(@from+teamoffset, to+teamoffset, TEAM_COLLISION[team]);
-					ci?.DrawLine(@from-teamoffset, to-teamoffset, TEAM_COLLISION[team]);
+					ci?.DrawLine(@from+teamoffset, to+teamoffset, teamcolor);
+					ci?.DrawLine(@from-teamoffset, to-teamoffset, teamcolor);
 				}
 			);
 		}
-		#endif
 		
-		#if SHOW_TAUNT_EVENT
-		if(element.HasAttribute("TauntEvent"))
+		if(cf.Display["TauntEvent"] && element.HasAttribute("TauntEvent"))
 		{
 			var tauntevent = element.GetAttribute("TauntEvent");
 			var labelPos = new Vector2(Math.Min(@from.x, to.x), Math.Min(@from.y, to.y));
 			action = action.Chain(
-				(ci) => ci?.DrawString(FONT, labelPos + COLLISION_TAUNT_EVENT_OFFSET*Vector2.Up, $"TauntEvent: {tauntevent}")
+				(ci) => ci?.DrawString(font, labelPos + cf.Sizes["CollisionTauntEventOffset"]*Vector2.Up, $"TauntEvent: {tauntevent}")
 			);
 		}
-		#endif
 		
-		#if SHOW_ANCHORS
-		if(element.HasAttribute("AnchorX") && element.HasAttribute("AnchorY"))
+		if(cf.Display["Anchors"] && element.HasAttribute("AnchorX") && element.HasAttribute("AnchorY"))
 		{
 			var anchor = element.GetElementPosition("Anchor");
 			var more_transparent = new Color(color.r, color.g, color.b, 0.3f);
 			action = action.Chain(
-				(ci) => ci?.DrawCircle(anchor, ANCHOR_RADIUS, more_transparent)
+				(ci) => ci?.DrawCircle(anchor, cf.Sizes["AnchorRadius"], more_transparent)
 			);
 		}
-		#endif
 		
 		return action;
 	}
 	
-	public DrawAction GenerateHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, HARD_COLLISION);
-	public DrawAction GenerateSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, SOFT_COLLISION);
-	public DrawAction GenerateNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, NOSLIDE_COLLISION);
+	public DrawAction GenerateHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["HardCollision"]);
+	public DrawAction GenerateSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["SoftCollision"]);
+	public DrawAction GenerateNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["NoSlideCollision"]);
 	
 	public DrawAction GenerateGenericGamemodeCollisionAction(XElement element, Vector2 offset, Color color) => GenerateGenericCollisionAction(element, offset, color);
-	public DrawAction GenerateGamemodeHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, GAMEMODE_HARD_COLLISION);
-	public DrawAction GenerateGamemodeSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, GAMEMODE_SOFT_COLLISION);
-	public DrawAction GenerateGamemodeNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, GAMEMODE_NOSLIDE_COLLISION);
+	public DrawAction GenerateGamemodeHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeHardCollision"]);
+	public DrawAction GenerateGamemodeSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeSoftCollision"]);
+	public DrawAction GenerateGamemodeNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeNoSlideCollision"]);
 	
 	public DrawAction GenerateGenericBouncyCollisionAction(XElement element, Vector2 offset, Color color) => GenerateGenericCollisionAction(element, offset, color);
-	public DrawAction GenerateBouncyHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, BOUNCY_HARD_COLLISION);
-	public DrawAction GenerateBouncySoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, BOUNCY_SOFT_COLLISION);
-	public DrawAction GenerateBouncyNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, BOUNCY_NOSLIDE_COLLISION);
+	public DrawAction GenerateBouncyHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyHardCollision"]);
+	public DrawAction GenerateBouncySoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncySoftCollision"]);
+	public DrawAction GenerateBouncyNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyNoSlideCollision"]);
 	
 	public DrawAction GenerateGenericPressurePlateCollisionAction(XElement element, Vector2 offset, Color color)
 	{
@@ -591,41 +448,44 @@ public class LevelReader
 		var action =  GenerateGenericCollisionAction(element, offset, color).Chain(
 			(ci) =>
 			{
-				#if SHOW_TRAP_POWERS
-				ci?.DrawString(FONT, firePos + PRESSURE_PLATE_POWERS_OFFSET*Vector2.Up, $"Powers: {powers}");
-				#endif
+				if(cf.Display["TrapPowers"])
+				ci?.DrawString(font, firePos + cf.Sizes["PressurePlatePowerOffset"]*Vector2.Up, $"Powers: {powers}");
 				
-				#if SHOW_TRAP_COOLDOWN
-				ci?.DrawString(FONT, labelPos + PRESSURE_PLATE_COOLDOWN_OFFSET*Vector2.Up, $"Cooldown: {cooldown}f");
-				#endif
+				if(cf.Display["TrapCooldown"])
+				ci?.DrawString(font, labelPos + cf.Sizes["PressurePlateCooldownOffset"]*Vector2.Up, $"Cooldown: {cooldown}f");
 				
-				#if SHOW_TRAP_POWER_OFFSET
-				ci?.DrawCircle(firePos, FIRE_OFFSET_RADIUS, PRESSURE_PLATE_FIRE_OFFSET);
-				ci?.DrawLine(middle, firePos, PRESSURE_PLATE_FIRE_OFFSET);
-				#endif
+				if(cf.Display["TrapPowerOffset"])
+				{
+					ci?.DrawCircle(firePos, cf.Sizes["FireOffsetRadius"], cf.Colors["PressurePlateFireOffset"]);
+					ci?.DrawLine(middle, firePos, cf.Colors["PressurePlateFireOffset"]);
+				}
 			}
 		);
 		
-		#if SHOW_TRAP_POWER_OFFSET
-		var lineend = firePos + dirmult*PRESSURE_PLATE_DIR_LINE_LENGTH*Vector2.Left;
-		var sideline1 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
-		var sideline2 = lineend + dirmult*new Vector2(PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_X, -PRESSURE_PLATE_DIR_LINE_SIDE_OFFSET_Y);
-		
-		action = action.Chain(
-			(ci) =>
-			{
-				ci?.DrawLine(firePos, lineend, PRESSURE_PLATE_LINE);
-				ci?.DrawLine(lineend, sideline1, PRESSURE_PLATE_LINE);
-				ci?.DrawLine(lineend, sideline2, PRESSURE_PLATE_LINE);
-			}
-		);
-		#endif
+		if(cf.Display["TrapPowerOffset"])
+		{
+			var lineend = firePos + dirmult*cf.Sizes["PressurePlateDirLineLength"]*Vector2.Left;
+			var offX = cf.Sizes["PressurePlateDirLineOffsetX"];
+			var offY = cf.Sizes["PressurePlateDirLineOffsetY"];
+			var sideline1 = lineend + dirmult*new Vector2(offX, offY);
+			var sideline2 = lineend + dirmult*new Vector2(offX, -offY);
+			
+			var plateLine = cf.Colors["PressurePlateLine"];
+			action = action.Chain(
+				(ci) =>
+				{
+					ci?.DrawLine(firePos, lineend, plateLine);
+					ci?.DrawLine(lineend, sideline1, plateLine);
+					ci?.DrawLine(lineend, sideline2, plateLine);
+				}
+			);
+		}
 		
 		return action;
 	}
 	
-	public DrawAction GeneratePressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, PRESSURE_PLATE_COLLISION);
-	public DrawAction GenerateSoftPressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, SOFT_PRESSURE_PLATE_COLLISION);
+	public DrawAction GeneratePressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["PressurePlateCollision"]);
+	public DrawAction GenerateSoftPressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["SoftPressurePlateCollision"]);
 	
 	//////////////////////////////////////////
 	///////////////////Misc///////////////////
@@ -633,7 +493,7 @@ public class LevelReader
 	public DrawAction GenerateGoalAction(XElement element, Vector2 offset)
 	{
 		var goal = element.GetIntAttribute("Team", 1);
-		return GenerateGenericAreaAction(element, offset, GOAL_COLORS[goal]);
+		return GenerateGenericAreaAction(element, offset, cf.Colors[$"GoalColor{goal}"]);
 	}
 	
 	//////////////////////////////////////////
@@ -649,8 +509,8 @@ public class LevelReader
 		navnodesPositions.Add(id, pos);
 		return (ci) =>
 		{
-			ci?.DrawCircle(pos, NAVNODE_RADIUS, NAVNODE_COLORS[type]);
-			ci?.DrawString(FONT, pos + NAVNODE_ID_OFFSET*Vector2.Up, $"NavID: {navid}");
+			ci?.DrawCircle(pos, cf.Sizes["NavnodeRadius"], cf.Colors[$"Navnode{type}"]);
+			ci?.DrawString(font, pos + cf.Sizes["NavnodeIDOffset"]*Vector2.Up, $"NavID: {navid}");
 		};
 	}
 	
@@ -678,12 +538,12 @@ public class LevelReader
 						if(firstcall)
 						{
 							var stypedesc = (types!="")?$" with type {types}":"";
-							GD.Print($"NavNode {navid} connects to NavNode {norms}{stypedesc}, but there's no NavNode with ID {norms}");
+							GD.PushWarning($"NavNode {navid} connects to NavNode {norms}{stypedesc}, but there's no NavNode with ID {norms}");
 						}
 						return EMPTY_ACTION;
 					}
 					
-					return (ci) => ci?.DrawLine(pos, (pos+navnodesPositions[norms])/2f, NAVNODE_COLORS[types]);
+					return (ci) => ci?.DrawLine(pos, (pos+navnodesPositions[norms])/2f, cf.Colors[$"Navnode{types}"]);
 				}
 		).Combine();
 	}
@@ -695,11 +555,8 @@ public class LevelReader
 		return int.Parse(s);
 	}
 	
-	private string GetNavType(string s)
-	{
-		string first = $"{s[0]}";
-		return NAVNODE_COLORS.ContainsKey(first)?first:"";
-	}
+	public static readonly HashSet<char> NAVTYPES = new HashSet<char>{'A', 'D', 'G', 'L', 'W'};
+	private string GetNavType(string s) => NAVTYPES.Contains(s[0])?s[0].ToString():"";
 	
 	//////////////////////////////////////////
 	////////////////Assets////////////////////
@@ -736,9 +593,8 @@ public class LevelReader
 		
 		return (ci) =>
 		{
-			#if SHOW_ASSET_POSITION
-			ci?.DrawCircle(offset, ASSET_POSITION_RADIUS, ASSET);
-			#endif
+			if(cf.Display["AssetPosition"])
+			ci?.DrawCircle(offset, cf.Sizes["AssetPositionRadius"], cf.Colors["Asset"]);
 			
 			ci?.DrawSetTransformMatrix(trans);
 			ci?.DrawTexture(texture, offset);
@@ -770,9 +626,8 @@ public class LevelReader
 			
 			var actions = assetActions.Concat(platformActions);
 			
-			#if SHOW_PLATFORM_LABEL
-			actions = actions.Append((ci) => ci?.DrawString(FONT, trans.origin, $"InstanceName: {instanceName}"));
-			#endif
+			if(cf.Display["PlatformLabel"])
+			actions = actions.Append((ci) => ci?.DrawString(font, trans.origin, $"InstanceName: {instanceName}"));
 			
 			return actions.Combine();
 		}
@@ -801,15 +656,18 @@ public class LevelReader
 		
 		if(!globalizeMovingPlatformPosition) pos += element.GetElementPositionOrDefault();
 		
-		return (ci) => {
-			#if SHOW_MOVING_PLATFORM_POSITION
-				#if SHOW_MOVING_PLATFORM_TIME
-					ci?.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
-				#endif
-				
-				ci?.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
-				ci?.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
-			#endif
+		if(!cf.Display["MovingPlatformsTime"]) return EMPTY_ACTION;
+		
+		return (ci) =>
+		{
+			if(cf.Display["MovingPlatformsTime"])
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}");
+			
+			if(cf.Display["MovingPlatformsID"])
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}");
+			
+			if(cf.Display["MovingPlatformsPosition"])
+			ci?.DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]);
 		};
 	}
 	
@@ -883,18 +741,22 @@ public class LevelReader
 						.Combine();
 		
 		pos += element.GetElementPositionOrDefault();
-		DrawAction dynAct = (ci) => {
-			#if SHOW_MOVING_PLATFORM_POSITION
-				#if SHOW_MOVING_PLATFORM_TIME
-					ci?.DrawString(FONT, pos + MOVING_PLATFORM_TIME_OFFSET*Vector2.Up, $"Time: {stepper.time}");
-				#endif
-				
-				ci?.DrawString(FONT, pos + MOVING_PLATFORM_PLATID_OFFSET*Vector2.Up, $"PlatID: {platid}");
-				ci?.DrawCircle(pos, MOVING_PLATFORM_RADIUS, MOVING_PLATFORM);
-			#endif
-		};
+		
+		DrawAction dynAct = cf.Display["MovingPlatformData"]?((ci) =>
+		{
+			if(cf.Display["MovingPlatformsTime"])
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}");
+			
+			if(cf.Display["MovingPlatformsID"])
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}");
+			
+			if(cf.Display["MovingPlatformsPosition"])
+			ci?.DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]);
+		}):EMPTY_ACTION;
+		
 		return element.Elements()
-					.Select(e => GetGenerator(e.Name.LocalName)(e,pos))
+					.Where(HasGenerator)
+					.Select(e => GetGenerator(e)(e,pos))
 					.Append(dynAct)
 					.Combine();
 	}
