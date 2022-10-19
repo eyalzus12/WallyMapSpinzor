@@ -84,11 +84,25 @@ public class LevelReader
 			.Select(InvokeAssetGenerator)
 			.Combine()(null);
 		
+		var tempred = redCount;
+		var tempblue = blueCount;
+		
 		//load all scoreboard assets
-		first.Elements("TeamScoreboard")
-			.SelectMany(e => Enumerable.Range(0, 10)
-			.Select(i => GenerateScoreboardAction(e, Transform2D.Identity, i, i)))
-			.Combine()(null);
+		for(int i = 0; i < 10; ++i)
+		{
+			redCount = i;
+			for(int j = 0; j < 10; ++j)
+			{
+				blueCount = j;
+				
+				first.Elements("TeamScoreboard")
+					.Select(e => GenerateScoreboardAction(e))
+					.Combine()(null);
+			}
+		}
+		
+		redCount = tempred;
+		blueCount = tempblue;
 	}
 	
 	public void Reset()
@@ -129,10 +143,14 @@ public class LevelReader
 		assetGenerators = new Dictionary<string, AssetGenerator>();
 		if(cf.Display["Assets"])
 		{
-			if(cf.Display["Background"]) assetGenerators.Add("Background", GenerateBackgroundAction);
 			assetGenerators.Add("Platform", GeneratePlatformAction);
 			assetGenerators.Add("MovingPlatform", GenerateMovingPlatformAction);
+			
+			if(cf.Display["ScoreboardDigits"])
+			assetGenerators.Add("TeamScoreboard", GenerateScoreboardAction);
 		}
+		
+		if(cf.Display["Background"]) assetGenerators.Add("Background", GenerateBackgroundAction);
 		
 		generators = new Dictionary<string, Generator>();
 		
@@ -220,20 +238,10 @@ public class LevelReader
 		
 		return (ci) =>
 		{
-			if(cf.Display["Assets"])
-			{
-				first.Elements()
+			first.Elements()
 				.Where(HasAssetGenerator)
 				.Select(InvokeAssetGenerator)
 				.Combine()(ci);
-				
-				if(cf.Display["ScoreboardDigits"])
-				first
-					.Elements("TeamScoreboard")
-					.Select(e => GenerateScoreboardAction(e, Transform2D.Identity, redCount, blueCount))
-					.Combine()(ci);
-				
-			}
 			
 			first.Elements()
 				.Where(HasGenerator)
@@ -242,7 +250,6 @@ public class LevelReader
 			
 			if(cf.Display["Navmesh"])
 				GenerateNavMeshActionList(first).Combine()(ci);
-			
 			
 			GenerateBlastzoneBoundsAction(first)(ci);
 			
@@ -315,8 +322,8 @@ public class LevelReader
 		return (ci) => ci?.DrawRect(rect, color, false);
 	}
 	
-	public DrawAction GenerateCameraBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, cf.Colors["CameraBounds"]);
-	public DrawAction GenerateSpawnBotBoundsAction(XElement element, Vector2 offset) => GenerateGenericBoundsAction(element, offset, cf.Colors["SpawnbotBounds"]);
+	public DrawAction GenerateCameraBoundsAction(XElement element, Vector2 offset = default) => GenerateGenericBoundsAction(element, offset, cf.Colors["CameraBounds"]);
+	public DrawAction GenerateSpawnBotBoundsAction(XElement element, Vector2 offset = default) => GenerateGenericBoundsAction(element, offset, cf.Colors["SpawnbotBounds"]);
 	
 	//////////////////////////////////////////
 	///////////////Item Spawns////////////////
@@ -337,14 +344,14 @@ public class LevelReader
 			return (ci) => ci?.DrawRect(rect, color, true);
 	}
 	
-	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSpawn"]);
-	public DrawAction GenerateInitialItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["InitialItemSpawn"]);
-	public DrawAction GenerateItemSetAction(XElement element, Vector2 offset) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSet"]);
+	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSpawn"]);
+	public DrawAction GenerateInitialItemSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["InitialItemSpawn"]);
+	public DrawAction GenerateItemSetAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSet"]);
 	
 	//////////////////////////////////////////
 	/////////////////Respawns/////////////////
 	//////////////////////////////////////////
-	public DrawAction GenerateRespawnAction(XElement element, Vector2 offset)
+	public DrawAction GenerateRespawnAction(XElement element, Vector2 offset = default)
 	{
 		var initial = element.GetBooleanAttribute("Initial");
 		var expandedInit = element.GetBooleanAttribute("ExpandedInit");
@@ -415,19 +422,19 @@ public class LevelReader
 		return action;
 	}
 	
-	public DrawAction GenerateHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["HardCollision"]);
-	public DrawAction GenerateSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["SoftCollision"]);
-	public DrawAction GenerateNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericCollisionAction(element, offset, cf.Colors["NoSlideCollision"]);
+	public DrawAction GenerateHardCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["HardCollision"]);
+	public DrawAction GenerateSoftCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["SoftCollision"]);
+	public DrawAction GenerateNoSlideCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["NoSlideCollision"]);
 	
 	public DrawAction GenerateGenericGamemodeCollisionAction(XElement element, Vector2 offset, Color color) => GenerateGenericCollisionAction(element, offset, color);
-	public DrawAction GenerateGamemodeHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeHardCollision"]);
-	public DrawAction GenerateGamemodeSoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeSoftCollision"]);
-	public DrawAction GenerateGamemodeNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeNoSlideCollision"]);
+	public DrawAction GenerateGamemodeHardCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeHardCollision"]);
+	public DrawAction GenerateGamemodeSoftCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeSoftCollision"]);
+	public DrawAction GenerateGamemodeNoSlideCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericGamemodeCollisionAction(element, offset, cf.Colors["GamemodeNoSlideCollision"]);
 	
 	public DrawAction GenerateGenericBouncyCollisionAction(XElement element, Vector2 offset, Color color) => GenerateGenericCollisionAction(element, offset, color);
-	public DrawAction GenerateBouncyHardCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyHardCollision"]);
-	public DrawAction GenerateBouncySoftCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncySoftCollision"]);
-	public DrawAction GenerateBouncyNoSlideCollisionAction(XElement element, Vector2 offset) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyNoSlideCollision"]);
+	public DrawAction GenerateBouncyHardCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyHardCollision"]);
+	public DrawAction GenerateBouncySoftCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncySoftCollision"]);
+	public DrawAction GenerateBouncyNoSlideCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyNoSlideCollision"]);
 	
 	public DrawAction GenerateGenericPressurePlateCollisionAction(XElement element, Vector2 offset, Color color)
 	{
@@ -484,13 +491,13 @@ public class LevelReader
 		return action;
 	}
 	
-	public DrawAction GeneratePressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["PressurePlateCollision"]);
-	public DrawAction GenerateSoftPressurePlateCollisionAction(XElement element, Vector2 offset) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["SoftPressurePlateCollision"]);
+	public DrawAction GeneratePressurePlateCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["PressurePlateCollision"]);
+	public DrawAction GenerateSoftPressurePlateCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericPressurePlateCollisionAction(element, offset, cf.Colors["SoftPressurePlateCollision"]);
 	
 	//////////////////////////////////////////
 	///////////////////Misc///////////////////
 	//////////////////////////////////////////
-	public DrawAction GenerateGoalAction(XElement element, Vector2 offset)
+	public DrawAction GenerateGoalAction(XElement element, Vector2 offset = default)
 	{
 		var goal = element.GetIntAttribute("Team", 1);
 		return GenerateGenericAreaAction(element, offset, cf.Colors[$"GoalColor{goal}"]);
@@ -500,7 +507,7 @@ public class LevelReader
 	//////////////Navigation//////////////////
 	//////////////////////////////////////////
 	
-	public DrawAction GenerateNavNodeAction(XElement element, Vector2 offset)
+	public DrawAction GenerateNavNodeAction(XElement element, Vector2 offset = default)
 	{
 		var pos = element.GetElementPositionOrDefault() + offset;
 		var navid = element.GetAttribute("NavID");
@@ -580,7 +587,7 @@ public class LevelReader
 		return GenerateBaseAssetAction(trans, offset, $"{mapArtPath}/{assetpath}", instanceName, bounds, hasSkulls);
 	}
 	
-	public DrawAction GenerateBaseAssetAction(Transform2D trans, Vector2 offset, string path, string instanceName, Vector2 bounds, bool hasSkulls = false)
+	public DrawAction GenerateBaseAssetAction(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false)
 	{
 		var texture = Utils.LoadImageFromPath(path, instanceName, bounds);
 		
@@ -602,9 +609,9 @@ public class LevelReader
 		};
 	}
 	
-	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans) => GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
+	public DrawAction GenerateBackgroundAction(XElement element, Transform2D trans = default) => GenerateGenericAssetAction(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
 	
-	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans)
+	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans = default)
 	{
 		var instanceName = element.GetAttribute("InstanceName");
 		
@@ -634,7 +641,7 @@ public class LevelReader
 		else return GenerateGenericAssetAction(element, trans, false, assetDir, instanceName);
 	}
 	
-	public DrawAction GenerateMovingPlatformAction(XElement element, Transform2D trans)
+	public DrawAction GenerateMovingPlatformAction(XElement element, Transform2D trans = default)
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
@@ -648,7 +655,7 @@ public class LevelReader
 					.Combine();
 	}
 	
-	public DrawAction GenerateSecondaryMovingPlatformAction(XElement element, Vector2 offset)
+	public DrawAction GenerateSecondaryMovingPlatformAction(XElement element, Vector2 offset = default)
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
@@ -671,7 +678,7 @@ public class LevelReader
 		};
 	}
 	
-	public DrawAction GenerateScoreboardAction(XElement element, Transform2D trans, int redCount, int blueCount)
+	public DrawAction GenerateScoreboardAction(XElement element, Transform2D trans = default)
 	{
 		var redX = element.GetFloatAttribute("RedTeamX");
 		var blueX = element.GetFloatAttribute("BlueTeamX");
@@ -712,15 +719,15 @@ public class LevelReader
 		
 		return (ci) =>
 		{
-			GenerateBaseAssetAction(redTrans, redOneDigit, $"{swfPath}/{redOneName}", "", Vector2.Zero)(ci);
+			GenerateBaseAssetAction(redTrans, redOneDigit, $"{swfPath}/{redOneName}")(ci);
 			
 			if(redDouble)
-				GenerateBaseAssetAction(redTrans, redTenDigit, $"{swfPath}/{redTenName}", "", Vector2.Zero)(ci);
+				GenerateBaseAssetAction(redTrans, redTenDigit, $"{swfPath}/{redTenName}")(ci);
 			
-			GenerateBaseAssetAction(blueTrans, blueOneDigit, $"{swfPath}/{blueOneName}", "", Vector2.Zero)(ci);
+			GenerateBaseAssetAction(blueTrans, blueOneDigit, $"{swfPath}/{blueOneName}")(ci);
 			
 			if(blueDouble)
-				GenerateBaseAssetAction(blueTrans, blueTenDigit, $"{swfPath}/{blueTenName}", "", Vector2.Zero)(ci);
+				GenerateBaseAssetAction(blueTrans, blueTenDigit, $"{swfPath}/{blueTenName}")(ci);
 		};
 	}
 	
@@ -728,7 +735,7 @@ public class LevelReader
 	////////////////Dynamic///////////////////
 	//////////////////////////////////////////
 	
-	public DrawAction GenerateGenericDynamicAction(XElement element, Vector2 offset)
+	public DrawAction GenerateGenericDynamicAction(XElement element, Vector2 offset = default)
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
@@ -761,8 +768,8 @@ public class LevelReader
 					.Combine();
 	}
 	
-	public DrawAction GenerateDynamicCollisionAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
-	public DrawAction GenerateDynamicRespawnAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
-	public DrawAction GenerateDynamicItemSpawnAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
-	public DrawAction GenerateDynamicNavNodeAction(XElement element, Vector2 offset) => GenerateGenericDynamicAction(element, offset);
+	public DrawAction GenerateDynamicCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericDynamicAction(element, offset);
+	public DrawAction GenerateDynamicRespawnAction(XElement element, Vector2 offset = default) => GenerateGenericDynamicAction(element, offset);
+	public DrawAction GenerateDynamicItemSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericDynamicAction(element, offset);
+	public DrawAction GenerateDynamicNavNodeAction(XElement element, Vector2 offset = default) => GenerateGenericDynamicAction(element, offset);
 }

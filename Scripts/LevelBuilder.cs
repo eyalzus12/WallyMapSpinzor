@@ -58,7 +58,7 @@ public class LevelBuilder : Node2D
 		else
 		{
 			image.FlipY();
-			image.SavePng(configReader.Paths["ScreenshotOutput"] + configReader.Paths["LevelName"] + ".png");
+			image.SavePng(configReader.Paths["ScreenshotOutput"] + "/" + configReader.Paths["LevelName"] + ".png");
 		}
 	}
 	
