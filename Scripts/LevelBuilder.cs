@@ -7,6 +7,7 @@ public class LevelBuilder : Node2D
 {
 	//initial speed of the moving platforms
 	public float speed = 0.05f;
+	public float baseSpeed = 0.05f;
 	//how much to increase or decrease speed by
 	public float speedInc = 0.01f;
 	public int roundSpeed => -(int)Math.Log10(Math.Abs(speedInc - Math.Truncate(speedInc)));
@@ -18,10 +19,13 @@ public class LevelBuilder : Node2D
 	
 	public LevelReader levelreader;
 	public ConfigReader configReader;
+
+	public FileDialog fd;
 	
 	public override void _Ready()
 	{
-		var fd = GetNode<FileDialog>("CanvasLayer/FileDialog");
+		speed = baseSpeed;
+		fd = GetNode<FileDialog>("CanvasLayer/FileDialog");
 		fd.Popup_();
 	}
 	
@@ -29,11 +33,12 @@ public class LevelBuilder : Node2D
 	{
 		if(Input.IsActionJustPressed("toggle_precision")) precise = !precise;
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
+		if(Input.IsActionJustPressed("reset_speed")) speed = baseSpeed;
+
+		if(precise?Input.IsActionJustPressed("increase_speed"):Input.IsActionPressed("increase_speed")) {speed += speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(precise?Input.IsActionJustPressed("decrease_speed"):Input.IsActionPressed("decrease_speed")) {speed -= speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
 		
-		if(inputChecker("increase_speed")) {speed += speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
-		if(inputChecker("decrease_speed")) {speed -= speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
-		
-		Update();
+		if(speed != 0f && !paused) Update();//don't update when paused
 	}
 	
 	public override void _Process(float delta)
@@ -43,9 +48,28 @@ public class LevelBuilder : Node2D
 			configReader.Load(configReader.FilePath);
 			SetSettings();
 			levelreader = new LevelReader(configReader);
+			Update();
 		}
 		
-		if(Input.IsActionJustPressed("clear_cache")) Utils.Cache.Clear();
+		if(Input.IsActionJustPressed("clear_cache"))
+		{
+			levelreader.instanceNameCounter.Clear();
+			Utils.Cache.Clear();
+			Update();
+		}
+
+		if(Input.IsActionJustPressed("toggle_no_skulls"))
+		{
+			levelreader.noSkulls = !levelreader.noSkulls;
+			Update();
+		}
+		
+		if(Input.IsActionJustPressed("reset_time"))
+		{
+			levelreader.ResetTime();
+			Update();
+		}
+
 		if(Input.IsActionJustPressed("toggle_fullscreen")) OS.WindowFullscreen = !OS.WindowFullscreen;
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
@@ -58,7 +82,11 @@ public class LevelBuilder : Node2D
 		else
 		{
 			image.FlipY();
-			image.SavePng(configReader.Paths["ScreenshotOutput"] + "/" + configReader.Paths["LevelName"] + ".png");
+
+			var path = configReader.Paths["ScreenshotOutput"];
+			if(!path.EndsWith("/"))path+="/";
+
+			image.SavePng($"{path}{configReader.Paths["LevelName"]}.png");
 		}
 	}
 	
@@ -71,15 +99,18 @@ public class LevelBuilder : Node2D
 	
 	public void _on_FileDialog_file_selected(string path)
 	{
+		fd.QueueFree();
 		configReader = new ConfigReader();
 		configReader.Load(path);
 		SetSettings();
 		levelreader = new LevelReader(configReader);
+		Update();
 	}
 	
 	public void SetSettings()
 	{
-		speed = Convert.ToSingle(configReader.Others["BaseSpeed"]);
+		baseSpeed = Convert.ToSingle(configReader.Others["BaseSpeed"]);
+		speed = baseSpeed;
 		speedInc = Convert.ToSingle(configReader.Others["SpeedIncrement"]);
 	}
 }

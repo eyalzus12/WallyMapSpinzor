@@ -26,8 +26,6 @@ resizable = true
 mode = 0
 access = 2
 show_hidden_files = true
-current_dir = "/Users/eyalz/Desktop/godot/WallyMapSpinzor"
-current_path = "/Users/eyalz/Desktop/godot/WallyMapSpinzor/"
 __meta__ = {
 "_edit_use_anchors_": false
 }

@@ -175,7 +175,7 @@ public static class Utils
 		var er = image.Load(path);
 		if(er != Error.Ok) 
 		{
-			//GD.Print($"Got error {er} while attempting to load image from path {path}");
+			GD.PushError($"Got error {er} while attempting to load image from path {path}");
 			Cache.Add((path,instanceName), null);
 			return null;
 		}
@@ -184,6 +184,7 @@ public static class Utils
 		if(bounds.y == 0f) bounds.y = image.GetHeight();
 		
 		bounds = bounds.Abs();
+
 		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)interpol);
 		
 		var texture = new ImageTexture();
@@ -192,20 +193,22 @@ public static class Utils
 		return texture;
 	}
 	
-	public static float ToRad(this float angle) => angle*((float)Math.PI)/180f;
-	
-	public static Vector2 Switch(this Vector2 v) => new Vector2(v.y, v.x);
-	
 	public static Vector2 Center(this Rect2 rec) => new Vector2(
-		rec.Position.x + rec.Size.x / 2,
-		rec.Position.y + rec.Size.y / 2
+		rec.Position.x + rec.Size.x / 2f,
+		rec.Position.y + rec.Size.y / 2f
 	);
 	
 	public static string Read(string filepath)
 	{
 		var f = new File();//create new file
 		var er = f.Open(filepath, File.ModeFlags.Read);//open file
-		if(er != Error.Ok) throw new ArgumentException($"Error {er} while reading file {filepath}");
+		
+		if(er != Error.Ok)
+		{
+			GD.PushError($"Error {er} while reading file {filepath}");
+			return "";
+		}
+		
 		var content = f.GetAsText();//read text
 		f.Close();//flush buffer
 		return content;

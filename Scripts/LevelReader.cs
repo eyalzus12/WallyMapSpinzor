@@ -16,10 +16,11 @@ public class LevelReader
 	public XDocument parsedMapFile;
 	public XDocument parsedLevelTypes;
 	
-	public Dictionary<string, Generator> generators;
-	public Dictionary<string, AssetGenerator> assetGenerators;
-	public Dictionary<int, KeyframeStepper> movingPlatformsDict;
-	public Dictionary<int, Vector2> navnodesPositions;
+	public Dictionary<string, Generator> generators = new Dictionary<string, Generator>();
+	public Dictionary<string, AssetGenerator> assetGenerators = new Dictionary<string, AssetGenerator>();
+	public Dictionary<int, KeyframeStepper> movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
+	public Dictionary<int, Vector2> navnodesPositions = new Dictionary<int, Vector2>();
+	public Dictionary<string, int> instanceNameCounter = new Dictionary<string, int>();
 	
 	public int defaultNumFrames;
 	public float defaultSlowMult;
@@ -33,8 +34,8 @@ public class LevelReader
 	public long callCount;
 	public string assetDir;
 	
-	public bool globalizeMovingPlatformPosition = false;
 	public bool noSkulls = false;
+	public HashSet<string> themes = new HashSet<string>();
 	
 	public string mapFolder;
 	public string swfPath;
@@ -60,13 +61,26 @@ public class LevelReader
 	public void SetupReader()
 	{
 		mapFolder = cf.Paths["LevelsFolder"];
-		mapName = cf.Paths["LevelName"];;
+		if(!mapFolder.EndsWith("/"))mapFolder+="/";
+
+		mapName = cf.Paths["LevelName"];
+
 		levelTypesPath = cf.Paths["LevelTypes"];
+
 		mapArtPath = cf.Paths["MapArt"];
+		if(!mapArtPath.EndsWith("/"))mapArtPath+="/";
+
 		swfPath = cf.Paths["SWFReplacement"];
+		if(!swfPath.EndsWith("/"))swfPath+="/";
+
+		themes.Clear();
+		themes.Add("");
+		var themesArr = cf.Others["Themes"].ToString().Split(",");
+		foreach(var theme in themesArr) themes.Add(theme.Trim());
+		
 		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
 		
-		parsedMapFile = XDocument.Parse(Utils.Read($"{mapFolder}/{mapName}.xml"));
+		parsedMapFile = XDocument.Parse(Utils.Read($"{mapFolder}{mapName}.xml"));
 		parsedLevelTypes = (levelTypesPath == "")?null:XDocument.Parse(Utils.Read(levelTypesPath));
 		
 		InitGenerators();
@@ -76,6 +90,7 @@ public class LevelReader
 	
 	public void LoadAssets()
 	{
+		instanceNameCounter.Clear();
 		var first = parsedMapFile?.FirstNode as XElement;
 		
 		//load all normal assets
@@ -110,12 +125,10 @@ public class LevelReader
 		callCount = 0;
 		redCount = Convert.ToInt32(cf.Others["RedScore"]);
 		blueCount = Convert.ToInt32(cf.Others["BlueScore"]);
-		globalizeMovingPlatformPosition = Convert.ToBoolean(cf.Others["GalvanPrimeFix"]);
 		noSkulls = Convert.ToBoolean(cf.Others["NoSkulls"]);
 		
 		var firstMap = parsedMapFile.FirstNode as XElement;
 		assetDir = firstMap.GetAttribute("AssetDir");
-		
 		
 		var firstLevelTypes = parsedLevelTypes?.FirstNode as XElement;
 		
@@ -134,13 +147,14 @@ public class LevelReader
 		defaultSlowMult = firstMap.GetFloatAttribute("SlowMult", 1f);
 		
 		ResetTime();
-		navnodesPositions = new Dictionary<int, Vector2>();
+		navnodesPositions.Clear();
 		foreach(var stepper in movingPlatformsDict.Values) stepper.AdvanceTime(globalStartFrame);
 	}
 	
 	public void InitGenerators()
 	{
-		assetGenerators = new Dictionary<string, AssetGenerator>();
+		assetGenerators.Clear();
+
 		if(cf.Display["Assets"])
 		{
 			assetGenerators.Add("Platform", GeneratePlatformAction);
@@ -152,7 +166,7 @@ public class LevelReader
 		
 		if(cf.Display["Background"]) assetGenerators.Add("Background", GenerateBackgroundAction);
 		
-		generators = new Dictionary<string, Generator>();
+		generators.Clear();
 		
 		if(cf.Display["Bounds"])
 		{
@@ -220,17 +234,8 @@ public class LevelReader
 	
 	public DrawAction GenerateDrawAction(float timepass)
 	{
-		if(Input.IsActionJustPressed("toggle_gloablized_moving_platform_position"))
-		{
-			globalizeMovingPlatformPosition = !globalizeMovingPlatformPosition;
-			ResetTime();
-		}
-		
-		if(Input.IsActionJustPressed("toggle_no_skulls")) noSkulls = !noSkulls;
-		
-		if(Input.IsActionJustPressed("reset_time")) ResetTime();
-		
-		navnodesPositions = new Dictionary<int, Vector2>();
+		navnodesPositions.Clear();
+		instanceNameCounter.Clear();
 		
 		AdvanceTime(timepass);
 		
@@ -259,7 +264,7 @@ public class LevelReader
 	
 	public void ResetTime()
 	{
-		movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
+		movingPlatformsDict.Clear();
 		(parsedMapFile.FirstNode as XElement).Elements("MovingPlatform").ForEach(SetupMovingPlatform);
 	}
 	
@@ -306,7 +311,7 @@ public class LevelReader
 		
 		var data = animationElement.GetElementKeyframes(mult, hasCenter, center);
 		
-		var stepper = new KeyframeStepper(data, globalizeMovingPlatformPosition?pos:Vector2.Zero, numframes*mult-1);
+		var stepper = new KeyframeStepper(data, Vector2.Zero, numframes*mult-1);
 		
 		stepper.AdvanceTime(startframe*mult + globalStartFrame);
 		movingPlatformsDict.Add(platid, stepper);
@@ -573,8 +578,6 @@ public class LevelReader
 		var offset = doOffset?element.GetElementPositionOrDefault():Vector2.Zero;
 		
 		var bounds = element.GetElementBoundsOrDefault();
-		if(bounds.x < 0f) trans *= Transform2D.FlipX;
-		if(bounds.y < 0f) trans *= Transform2D.FlipY;
 		
 		var assetname = (assetNameOverride == "")?element.GetAttribute("AssetName"):assetNameOverride;
 		
@@ -583,20 +586,30 @@ public class LevelReader
 		$"{assetfolder}/{assetname}";
 		
 		var hasSkulls = element.GetBooleanAttribute("HasSkulls", false);
+		var theme = element.GetAttribute("Theme");
 		
-		return GenerateBaseAssetAction(trans, offset, $"{mapArtPath}/{assetpath}", instanceName, bounds, hasSkulls);
+		return GenerateBaseAssetAction(trans, offset, $"{mapArtPath}{assetpath}", instanceName, bounds, hasSkulls, theme);
 	}
 	
-	public DrawAction GenerateBaseAssetAction(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false)
+	public DrawAction GenerateBaseAssetAction(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="")
 	{
-		var texture = Utils.LoadImageFromPath(path, instanceName, bounds);
-		
 		if(
-			texture is null ||
-			(!noSkulls && instanceName == "am_NoSkulls") ||
+			//check for no skulls
+			(!noSkulls && instanceName.EndsWith("am_NoSkulls")) ||
+			(!noSkulls && path.EndsWith("_NoSkulls.jpg")) ||
 			(noSkulls && hasSkulls) ||
-			(instanceName == "am_Holiday")
+			//check for theme
+			(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s)))
 		) return EMPTY_ACTION;
+
+		var texture = Utils.LoadImageFromPath(path, instanceName, bounds);
+
+		if(texture is null) return EMPTY_ACTION;
+
+		trans = trans.Translated(offset);
+
+		if(bounds.x < 0f) trans.Scale *= new Vector2(-1,1);
+		if(bounds.y < 0f) trans.Scale *= new Vector2(1,-1);
 		
 		return (ci) =>
 		{
@@ -604,7 +617,7 @@ public class LevelReader
 			ci?.DrawCircle(offset, cf.Sizes["AssetPositionRadius"], cf.Colors["Asset"]);
 			
 			ci?.DrawSetTransformMatrix(trans);
-			ci?.DrawTexture(texture, offset);
+			ci?.DrawTexture(texture, Vector2.Zero);
 			ci?.DrawSetTransformMatrix(Transform2D.Identity);
 		};
 	}
@@ -613,15 +626,23 @@ public class LevelReader
 	
 	public DrawAction GeneratePlatformAction(XElement element, Transform2D trans = default)
 	{
+		var theme = element.GetAttribute("Theme");
+		if(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s))) return EMPTY_ACTION;
+
 		var instanceName = element.GetAttribute("InstanceName");
+		if(!instanceNameCounter.ContainsKey(instanceName)) instanceNameCounter[instanceName] = -1;
+		instanceNameCounter[instanceName]++;
+		instanceName = instanceNameCounter[instanceName].ToString() + "_" + instanceName;
 		
 		trans = trans.Translated(element.GetElementPositionOrDefault());
 		
-		trans.Scale *= element.GetFloatAttribute("Scale", 1);
-		trans.Scale *= Vector2.Right * element.GetFloatAttribute("ScaleX", 1) + Vector2.Down;
-		trans.Scale *= Vector2.Down * element.GetFloatAttribute("ScaleY", 1) + Vector2.Right;
+		trans.Scale *=
+		new Vector2(
+			element.GetFloatAttribute("ScaleX", 1),
+			element.GetFloatAttribute("ScaleY", 1)
+		)*element.GetFloatAttribute("Scale", 1);
 		
-		trans.Rotation += element.GetFloatAttribute("Rotation").ToRad();
+		trans.Rotation += Mathf.Deg2Rad(element.GetFloatAttribute("Rotation"));
 		
 		if(!element.HasAttribute("AssetName"))
 		{
@@ -645,9 +666,7 @@ public class LevelReader
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		trans = trans.Translated(stepper.GetCurrent());
-		
-		if(!globalizeMovingPlatformPosition) trans = trans.Translated(element.GetElementPositionOrDefault());
+		trans = trans.Translated(stepper.GetCurrent()).Translated(element.GetElementPositionOrDefault());
 		
 		return element.Elements()
 					.Where(HasAssetGenerator)
@@ -659,9 +678,7 @@ public class LevelReader
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		var pos = stepper.GetCurrent() + offset;
-		
-		if(!globalizeMovingPlatformPosition) pos += element.GetElementPositionOrDefault();
+		var pos = stepper.GetCurrent() + offset + element.GetElementPositionOrDefault();
 		
 		if(!cf.Display["MovingPlatformsTime"]) return EMPTY_ACTION;
 		
@@ -739,15 +756,7 @@ public class LevelReader
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		var pos = stepper.GetCurrent() + offset;
-		
-		if(globalizeMovingPlatformPosition)
-			return element.Elements()
-						.Where(HasGenerator)
-						.Select(e => GetGenerator(e)(e,pos))
-						.Combine();
-		
-		pos += element.GetElementPositionOrDefault();
+		var pos = stepper.GetCurrent() + offset - stepper.keyframes[0].position + element.GetElementPositionOrDefault();
 		
 		DrawAction dynAct = cf.Display["MovingPlatformData"]?((ci) =>
 		{
