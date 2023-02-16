@@ -283,9 +283,9 @@ public class LevelReader
 		
 		return (ci) =>
 		{
-			if(ci is Node n)
+			if(ci is LevelBuilder n)
 			{
-				var navcam = n.GetNode<NavigationCamera>("Camera");
+				var navcam = n.camera;
 				if(Input.IsActionJustPressed("fit_camera")) navcam.FitToRect(camerabounds);
 				if(Input.IsActionJustPressed("fit_blastzones")) navcam.FitToRect(rect);
 			}

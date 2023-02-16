@@ -19,11 +19,13 @@ public class LevelBuilder : Node2D
 	
 	public LevelReader levelreader;
 	public ConfigReader configReader;
+	public NavigationCamera camera;
 
 	public FileDialog fd;
 	
 	public override void _Ready()
 	{
+		camera = GetNode<NavigationCamera>("Camera");
 		speed = baseSpeed;
 		fd = GetNode<FileDialog>("CanvasLayer/FileDialog");
 		fd.Popup_();
@@ -35,10 +37,11 @@ public class LevelBuilder : Node2D
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
 		if(Input.IsActionJustPressed("reset_speed")) speed = baseSpeed;
 
-		if(precise?Input.IsActionJustPressed("increase_speed"):Input.IsActionPressed("increase_speed")) {speed += speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
-		if(precise?Input.IsActionJustPressed("decrease_speed"):Input.IsActionPressed("decrease_speed")) {speed -= speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("increase_speed")) {speed += speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("decrease_speed")) {speed -= speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
 		
-		if(speed != 0f && !paused) Update();//don't update when paused
+		var updateFreq = (configReader is null)?1f:float.Parse(configReader.Others["UpdateFreq"].ToString());
+		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%updateFreq == 0) Update();
 	}
 	
 	public override void _Process(float delta)
@@ -69,7 +72,10 @@ public class LevelBuilder : Node2D
 			levelreader.ResetTime();
 			Update();
 		}
-
+		
+		//so shit works during pause
+		if(Input.IsActionJustPressed("fit_camera")||Input.IsActionJustPressed("fit_blastzones")||inputChecker("forward_once")||inputChecker("back_once")) Update();
+		
 		if(Input.IsActionJustPressed("toggle_fullscreen")) OS.WindowFullscreen = !OS.WindowFullscreen;
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
@@ -104,6 +110,7 @@ public class LevelBuilder : Node2D
 		configReader.Load(path);
 		SetSettings();
 		levelreader = new LevelReader(configReader);
+		camera.cf = configReader;
 		Update();
 	}
 	

@@ -3,6 +3,10 @@ using System;
 
 public class NavigationCamera : Camera2D
 {
+	public ConfigReader cf = null;
+	
+	public float fitoffset => (cf is null)?0f:float.Parse(cf.Others["FitOffset"].ToString());
+	
 	public const float CAMERA_ACCELERATION = 40f;
 	public const float CAMERA_SPEED = 400f;
 	public const float MAXZOOM_IN = 0.1f;
@@ -14,10 +18,10 @@ public class NavigationCamera : Camera2D
 		var speedmult = (Zoom.x/10f);
 		
 		var offsetVector = Vector2.Zero;
-		if(Input.IsActionPressed("ui_left")) offsetVector -= new Vector2(speedmult*CAMERA_ACCELERATION, 0);
-		if(Input.IsActionPressed("ui_right")) offsetVector += new Vector2(speedmult*CAMERA_ACCELERATION, 0);
-		if(Input.IsActionPressed("ui_up")) offsetVector -= new Vector2(0, speedmult*CAMERA_ACCELERATION);
-		if(Input.IsActionPressed("ui_down")) offsetVector += new Vector2(0, speedmult*CAMERA_ACCELERATION);
+		if(Input.IsActionPressed("ui_left")) offsetVector -= speedmult*CAMERA_ACCELERATION*Vector2.Right;
+		if(Input.IsActionPressed("ui_right")) offsetVector += speedmult*CAMERA_ACCELERATION*Vector2.Right;
+		if(Input.IsActionPressed("ui_up")) offsetVector -= speedmult*CAMERA_ACCELERATION*Vector2.Down;
+		if(Input.IsActionPressed("ui_down")) offsetVector += speedmult*CAMERA_ACCELERATION*Vector2.Down;
 		offsetVector.x = Math.Max(-CAMERA_SPEED, Math.Min(offsetVector.x, speedmult*CAMERA_SPEED));
 		offsetVector.y = Math.Max(-CAMERA_SPEED, Math.Min(offsetVector.y, speedmult*CAMERA_SPEED));
 		Offset += offsetVector;
@@ -35,6 +39,6 @@ public class NavigationCamera : Camera2D
 	{
 		Offset = rect.Center();
 		var cameraZoomXY = rect.Size/GetViewportRect().Size;
-		Zoom = (Math.Max(cameraZoomXY.x, cameraZoomXY.y) + 0.01f)*Vector2.One;
+		Zoom = (Math.Max(cameraZoomXY.x, cameraZoomXY.y)+fitoffset)*Vector2.One;
 	}
 }
