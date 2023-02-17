@@ -10,6 +10,7 @@ public class LevelBuilder : Node2D
 	public float baseSpeed = 0.05f;
 	//how much to increase or decrease speed by
 	public float speedInc = 0.01f;
+	public int updateFreq = 1;
 	public int roundSpeed => -(int)Math.Log10(Math.Abs(speedInc - Math.Truncate(speedInc)));
 	
 	public bool precise = false;
@@ -20,6 +21,8 @@ public class LevelBuilder : Node2D
 	public LevelReader levelreader;
 	public ConfigReader configReader;
 	public NavigationCamera camera;
+	public Label displayLabel;
+	public AnimationPlayer displayLabelAnimationPlayer;
 
 	public FileDialog fd;
 	
@@ -29,19 +32,27 @@ public class LevelBuilder : Node2D
 		speed = baseSpeed;
 		fd = GetNode<FileDialog>("CanvasLayer/FileDialog");
 		fd.Popup_();
+		displayLabel = GetNode<Label>("CanvasLayer/DisplayLabel");
+		displayLabelAnimationPlayer = displayLabel.GetNode<AnimationPlayer>("DisplayLabelAnimationPlayer");
+	}
+
+	public void Display(string s)
+	{
+		displayLabel.Text = s;
+		displayLabelAnimationPlayer.Stop(true);
+		displayLabelAnimationPlayer.Play("Fade");
 	}
 	
 	public override void _PhysicsProcess(float delta)
 	{
-		if(Input.IsActionJustPressed("toggle_precision")) precise = !precise;
-		if(Input.IsActionJustPressed("pause")) {paused = !paused; GD.Print((paused?"P":"Unp") + "aused");}
-		if(Input.IsActionJustPressed("reset_speed")) speed = baseSpeed;
+		if(Input.IsActionJustPressed("toggle_precision")) {precise = !precise; Display($"Input: {(precise?"Tap":"Hold")}");}
+		if(Input.IsActionJustPressed("pause")) {paused = !paused; Display($"{(paused?"P":"Unp")}aused");}
+		if(Input.IsActionJustPressed("reset_speed")) {speed = baseSpeed; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 
-		if(inputChecker("increase_speed")) {speed += speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
-		if(inputChecker("decrease_speed")) {speed -= speedInc; GD.Print($"New speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("increase_speed")) {speed += speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
+		if(inputChecker("decrease_speed")) {speed -= speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 		
-		var updateFreq = (configReader is null)?1f:float.Parse(configReader.Others["UpdateFreq"].ToString());
-		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%updateFreq == 0) Update();
+		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%(ulong)updateFreq == 0) Update();
 	}
 	
 	public override void _Process(float delta)
@@ -100,7 +111,7 @@ public class LevelBuilder : Node2D
 	{
 		if(levelreader is null) return;
 		var mult = inputChecker("forward_once")?1:inputChecker("back_once")?-1:paused?0:1;
-		levelreader.GenerateDrawAction(mult*speed)(this);
+		levelreader.GenerateDrawAction(mult*speed*updateFreq)(this);
 	}
 	
 	public void _on_FileDialog_file_selected(string path)
@@ -119,5 +130,6 @@ public class LevelBuilder : Node2D
 		baseSpeed = Convert.ToSingle(configReader.Others["BaseSpeed"]);
 		speed = baseSpeed;
 		speedInc = Convert.ToSingle(configReader.Others["SpeedIncrement"]);
+		updateFreq = int.Parse(configReader.Others["UpdateFreq"].ToString());
 	}
 }

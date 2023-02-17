@@ -179,6 +179,7 @@ public class LevelReader
 			generators.Add("ItemSpawn", GenerateItemSpawnAction);
 			generators.Add("ItemInitSpawn", GenerateInitialItemSpawnAction);
 			generators.Add("ItemSet", GenerateItemSetAction);
+			generators.Add("TeamItemInitSpawn", GenerateTeamItemInitSpawnAction);
 			generators.Add("DynamicItemSpawn", GenerateDynamicItemSpawnAction);
 		}
 		
@@ -202,6 +203,10 @@ public class LevelReader
 			generators.Add("BouncySoftCollision", GenerateBouncySoftCollisionAction);
 			generators.Add("BouncyNoSlideCollision", GenerateBouncyNoSlideCollisionAction);
 			
+			generators.Add("TriggerCollision", GenerateTriggerCollisionAction);
+			generators.Add("StickyCollision", GenerateStickyCollisionAction);
+			generators.Add("ItemIgnoreCollision", GenerateItemIgnoreCollisionAction);
+
 			generators.Add("PressurePlateCollision", GeneratePressurePlateCollisionAction);
 			generators.Add("SoftPressurePlateCollision", GenerateSoftPressurePlateCollisionAction);
 			
@@ -218,6 +223,7 @@ public class LevelReader
 		}
 		
 		if(cf.Display["Goals"]) generators.Add("Goal", GenerateGoalAction);
+		if(cf.Display["NoDodgeZones"]) generators.Add("NoDodgeZone", GenerateNoDodgeZoneAction);
 	}
 	
 	
@@ -240,23 +246,27 @@ public class LevelReader
 		AdvanceTime(timepass);
 		
 		var first = parsedMapFile.FirstNode as XElement;
-		
-		return (ci) =>
-		{
-			first.Elements()
+
+		var assetActions = first.Elements()
 				.Where(HasAssetGenerator)
 				.Select(InvokeAssetGenerator)
-				.Combine()(ci);
-			
-			first.Elements()
+				.Combine();
+
+		var normalActions = first.Elements()
 				.Where(HasGenerator)
 				.Select(InvokeGenerator)
-				.Combine()(ci);
-			
-			if(cf.Display["Navmesh"])
-				GenerateNavMeshActionList(first).Combine()(ci);
-			
-			GenerateBlastzoneBoundsAction(first)(ci);
+				.Combine();
+		
+		var navmeshActions = cf.Display["Navmesh"]?GenerateNavMeshActionList(first).Combine():EMPTY_ACTION;
+		
+		var blastzoneAction = GenerateBlastzoneBoundsAction(first);
+
+		return (ci) =>
+		{
+			assetActions(ci);
+			normalActions(ci);
+			navmeshActions(ci);
+			blastzoneAction(ci);
 			
 			callCount++;
 		};
@@ -352,6 +362,7 @@ public class LevelReader
 	public DrawAction GenerateItemSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSpawn"]);
 	public DrawAction GenerateInitialItemSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["InitialItemSpawn"]);
 	public DrawAction GenerateItemSetAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["ItemSet"]);
+	public DrawAction GenerateTeamItemInitSpawnAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["TeamItemInitSpawn"]);
 	
 	//////////////////////////////////////////
 	/////////////////Respawns/////////////////
@@ -440,6 +451,10 @@ public class LevelReader
 	public DrawAction GenerateBouncyHardCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyHardCollision"]);
 	public DrawAction GenerateBouncySoftCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncySoftCollision"]);
 	public DrawAction GenerateBouncyNoSlideCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericBouncyCollisionAction(element, offset, cf.Colors["BouncyNoSlideCollision"]);
+
+	public DrawAction GenerateTriggerCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["TriggerCollision"]);
+	public DrawAction GenerateStickyCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["StickyCollision"]);
+	public DrawAction GenerateItemIgnoreCollisionAction(XElement element, Vector2 offset = default) => GenerateGenericCollisionAction(element, offset, cf.Colors["ItemIgnoreCollision"]);
 	
 	public DrawAction GenerateGenericPressurePlateCollisionAction(XElement element, Vector2 offset, Color color)
 	{
@@ -457,20 +472,21 @@ public class LevelReader
 		var middle = (@from+to)/2f;
 		var firePos = fireoffset + offset;
 		
-		var action =  GenerateGenericCollisionAction(element, offset, color).Chain(
+		var action =  GenerateGenericCollisionAction(element, offset, color);
+
+		if(cf.Display["TrapPowers"]) action = action.Chain(
+			(ci) => ci?.DrawString(font, firePos + cf.Sizes["PressurePlatePowerOffset"]*Vector2.Up, $"Powers: {powers}")
+		);
+
+		if(cf.Display["TrapCooldown"]) action = action.Chain(
+			(ci) => ci?.DrawString(font, labelPos + cf.Sizes["PressurePlateCooldownOffset"]*Vector2.Up, $"Cooldown: {cooldown}f")
+		);
+
+		if(cf.Display["TrapPowerOffset"]) action = action.Chain(
 			(ci) =>
 			{
-				if(cf.Display["TrapPowers"])
-				ci?.DrawString(font, firePos + cf.Sizes["PressurePlatePowerOffset"]*Vector2.Up, $"Powers: {powers}");
-				
-				if(cf.Display["TrapCooldown"])
-				ci?.DrawString(font, labelPos + cf.Sizes["PressurePlateCooldownOffset"]*Vector2.Up, $"Cooldown: {cooldown}f");
-				
-				if(cf.Display["TrapPowerOffset"])
-				{
-					ci?.DrawCircle(firePos, cf.Sizes["FireOffsetRadius"], cf.Colors["PressurePlateFireOffset"]);
-					ci?.DrawLine(middle, firePos, cf.Colors["PressurePlateFireOffset"]);
-				}
+				ci?.DrawCircle(firePos, cf.Sizes["FireOffsetRadius"], cf.Colors["PressurePlateFireOffset"]);
+				ci?.DrawLine(middle, firePos, cf.Colors["PressurePlateFireOffset"]);
 			}
 		);
 		
@@ -507,6 +523,8 @@ public class LevelReader
 		var goal = element.GetIntAttribute("Team", 1);
 		return GenerateGenericAreaAction(element, offset, cf.Colors[$"GoalColor{goal}"]);
 	}
+
+	public DrawAction GenerateNoDodgeZoneAction(XElement element, Vector2 offset = default) => GenerateGenericAreaAction(element, offset, cf.Colors["NoDodgeZone"]);
 	
 	//////////////////////////////////////////
 	//////////////Navigation//////////////////
