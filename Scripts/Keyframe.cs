@@ -42,7 +42,7 @@ public struct Keyframe
 		}
 		else
 		{
-			return position.LinearInterpolate(other.position, weight);
+			return position.Lerp(other.position, weight);
 		}
 	}
 }

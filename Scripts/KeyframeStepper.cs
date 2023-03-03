@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-public class KeyframeStepper
+public partial class KeyframeStepper
 {
 	public List<Keyframe> keyframes;
 	public List<float> timeframes;
@@ -14,8 +14,8 @@ public class KeyframeStepper
 	public KeyframeStepper(IEnumerable<Keyframe> frames, Vector2 offset, float numframes)
 	{
 		this.numframes = numframes;
-		keyframes = new List<Keyframe>();
-		timeframes = new List<float>();
+		keyframes = new();
+		timeframes = new();
 		foreach(var keyframe in frames)
 		{
 			var temp_key = keyframe.frame;
@@ -23,7 +23,7 @@ public class KeyframeStepper
 			var temp_center = keyframe.center + offset;
 			if(temp_key == -1)
 			{
-				temp_key = temp_pos.x;
+				temp_key = temp_pos.X;
 				temp_pos = keyframes.Last().position + offset;
 				temp_center = keyframes.Last().center + offset;
 			}
@@ -45,11 +45,13 @@ public class KeyframeStepper
 		if(current < 0) current = ~current;
 		if(current == keyframes.Count) current = 0;
 	}
-	
-	public Vector2 GetCurrent()
+
+	public Keyframe GetUsedKeyframe()
 	{
 		var prev = current-1;
 		if(prev == -1) prev = keyframes.Count-1;
-		return keyframes[prev].StepTowards(keyframes[current], time);
+		return keyframes[prev];
 	}
+	
+	public Vector2 GetCurrent() => GetUsedKeyframe().StepTowards(keyframes[current], time);
 }

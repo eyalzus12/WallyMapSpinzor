@@ -2,16 +2,16 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-public class ConfigReader
+public partial class ConfigReader
 {
 	public string FilePath{get; set;} = "";
-	public ConfigFile cf{get; set;} = new ConfigFile();
+	public ConfigFile cf{get; set;} = new();
 	
-	public Dictionary<string, string> Paths{get; set;} = new Dictionary<string, string>();
-	public Dictionary<string, bool> Display{get; set;} = new Dictionary<string, bool>();
-	public Dictionary<string, float> Sizes{get; set;} = new Dictionary<string, float>();
-	public Dictionary<string, Color> Colors{get; set;} = new Dictionary<string, Color>();
-	public Dictionary<string, object> Others{get; set;} = new Dictionary<string, object>();
+	public Dictionary<string, string> Paths{get; set;} = new();
+	public Dictionary<string, bool> Display{get; set;} = new();
+	public Dictionary<string, float> Sizes{get; set;} = new();
+	public Dictionary<string, Color> Colors{get; set;} = new();
+	public Dictionary<string, Variant> Others{get; set;} = new();
 	
 	public ConfigReader() {}
 	
@@ -35,25 +35,25 @@ public class ConfigReader
 	public const string PATHS = "Paths";
 	public void StorePaths()
 	{
-		foreach(var key in cf.GetSectionKeys(PATHS)) Paths[key] = (string)cf.GetValue(PATHS, key);
+		foreach(var key in cf.GetSectionKeys(PATHS)) Paths[key] = cf.GetValue(PATHS, key).AsString();
 	}
 	
 	public const string DISPLAY = "Display";
 	public void StoreDisplays()
 	{
-		foreach(var key in cf.GetSectionKeys(DISPLAY)) Display[key] = Convert.ToBoolean(cf.GetValue(DISPLAY, key));
+		foreach(var key in cf.GetSectionKeys(DISPLAY)) Display[key] = cf.GetValue(DISPLAY, key).AsBool();
 	}
 	
 	public const string SIZES = "Sizes";
 	public void StoreSizes()
 	{
-		foreach(var key in cf.GetSectionKeys(SIZES)) Sizes[key] = Convert.ToSingle(cf.GetValue(SIZES, key));
+		foreach(var key in cf.GetSectionKeys(SIZES)) Sizes[key] = cf.GetValue(SIZES, key).AsSingle();
 	}
 	
 	public const string COLORS = "Colors";
 	public void StoreColors()
 	{
-		foreach(var key in cf.GetSectionKeys(COLORS)) Colors[key] = (Color)cf.GetValue(COLORS, key);
+		foreach(var key in cf.GetSectionKeys(COLORS)) Colors[key] = cf.GetValue(COLORS, key).AsColor();
 	}
 	
 	public const string OTHERS = "Others";

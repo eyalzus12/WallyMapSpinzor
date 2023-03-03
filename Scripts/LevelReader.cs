@@ -7,7 +7,7 @@ using DrawAction = System.Action<Godot.CanvasItem>;
 using Generator = System.Func<System.Xml.Linq.XElement, Godot.Vector2, System.Action<Godot.CanvasItem>>;
 using AssetGenerator = System.Func<System.Xml.Linq.XElement, Godot.Transform2D, System.Action<Godot.CanvasItem>>;
 
-public class LevelReader
+public partial class LevelReader
 {
 	public static readonly DrawAction EMPTY_ACTION = (ci) => {};
 	public static readonly Generator EMPTY_GENERATOR = (ci, offset) => EMPTY_ACTION;
@@ -16,11 +16,11 @@ public class LevelReader
 	public XDocument parsedMapFile;
 	public XDocument parsedLevelTypes;
 	
-	public Dictionary<string, Generator> generators = new Dictionary<string, Generator>();
-	public Dictionary<string, AssetGenerator> assetGenerators = new Dictionary<string, AssetGenerator>();
-	public Dictionary<int, KeyframeStepper> movingPlatformsDict = new Dictionary<int, KeyframeStepper>();
-	public Dictionary<int, Vector2> navnodesPositions = new Dictionary<int, Vector2>();
-	public Dictionary<string, int> instanceNameCounter = new Dictionary<string, int>();
+	public Dictionary<string, Generator> generators = new();
+	public Dictionary<string, AssetGenerator> assetGenerators = new();
+	public Dictionary<int, KeyframeStepper> movingPlatformsDict = new();
+	public Dictionary<int, Vector2> navnodesPositions = new();
+	public Dictionary<string, int> instanceNameCounter = new();
 	
 	public int defaultNumFrames;
 	public float defaultSlowMult;
@@ -35,7 +35,7 @@ public class LevelReader
 	public string assetDir;
 	
 	public bool noSkulls = false;
-	public HashSet<string> themes = new HashSet<string>();
+	public HashSet<string> themes = new();
 	
 	public string mapFolder;
 	public string swfPath;
@@ -75,7 +75,7 @@ public class LevelReader
 
 		themes.Clear();
 		themes.Add("");
-		var themesArr = cf.Others["Themes"].ToString().Split(",");
+		var themesArr = cf.Others["Themes"].AsString().Split(",");
 		foreach(var theme in themesArr) themes.Add(theme.Trim());
 		
 		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
@@ -123,9 +123,9 @@ public class LevelReader
 	public void Reset()
 	{
 		callCount = 0;
-		redCount = Convert.ToInt32(cf.Others["RedScore"]);
-		blueCount = Convert.ToInt32(cf.Others["BlueScore"]);
-		noSkulls = Convert.ToBoolean(cf.Others["NoSkulls"]);
+		redCount = cf.Others["RedScore"].AsInt32();
+		blueCount = cf.Others["BlueScore"].AsInt32();
+		noSkulls = cf.Others["NoSkulls"].AsBool();
 		
 		var firstMap = parsedMapFile.FirstNode as XElement;
 		assetDir = firstMap.GetAttribute("AssetDir");
@@ -288,7 +288,7 @@ public class LevelReader
 	
 	public DrawAction GenerateBlastzoneBoundsAction(XElement element)
 	{
-		var camerabounds = element.Elements("CameraBounds").First().GetElementRect();
+		var camerabounds = element.Element("CameraBounds").GetElementRect();
 		var rect = camerabounds.GrowIndividual(blastzoneLeft, blastzoneTop, blastzoneRight, blastzoneBottom);
 		
 		return (ci) =>
@@ -310,13 +310,13 @@ public class LevelReader
 		var pos = element.GetElementPositionOrDefault();
 		
 		var platid = element.GetIntAttribute("PlatID");
-		var animationElement = element.Elements("Animation").First();
+		var animationElement = element.Element("Animation");
 		
 		var numframes_defaultto = (defaultNumFrames == -1)?"":$"{defaultNumFrames}";
 		var numframes = int.Parse(animationElement.GetAttribute("NumFrames", numframes_defaultto));
 		var startframe = animationElement.GetIntAttribute("StartFrame", 1) - 1;
 		var mult = animationElement.GetFloatAttribute("SlowMult", defaultSlowMult);
-		var hasCenter = animationElement.HasAttribute("CenterX") || element.HasAttribute("CenterY");
+		var hasCenter = animationElement.HasAttribute("CenterX") || animationElement.HasAttribute("CenterY");
 		var center = animationElement.GetElementPositionOrDefault("Center");
 		
 		var data = animationElement.GetElementKeyframes(mult, hasCenter, center);
@@ -347,13 +347,13 @@ public class LevelReader
 	{
 		var rect = element.GetElementRect();
 		rect.Position += offset;
-		if(rect.Size.x == 0 && rect.Size.y == 0)
+		if(rect.Size.X == 0 && rect.Size.Y == 0)
 		{
 			var rad = cf.Sizes["DefaultAreaRadius"];
 			var newrect = new Rect2(rect.Position - rad*Vector2.One, 2f*rad*Vector2.One);
 			return (ci) => ci?.DrawRect(newrect, color, false);
 		}
-		else if(rect.Size.x == 0 || rect.Size.y == 0)
+		else if(rect.Size.X == 0 || rect.Size.Y == 0)
 			return (ci) => ci?.DrawLine(rect.Position, rect.End, color);
 		else
 			return (ci) => ci?.DrawRect(rect, color, true);
@@ -387,18 +387,18 @@ public class LevelReader
 	//////////////////////////////////////////
 	public DrawAction GenerateGenericCollisionAction(XElement element, Vector2 offset, Color color)
 	{
-		(var @from, var to) = element.GetElementPoints();
-		@from += offset; to += offset;
-		var dir = (to-@from).Normalized();
-		var clockwise_dir = new Vector2(-dir.y, dir.x);
+		(var from, var to) = element.GetElementPoints();
+		from += offset; to += offset;
+		var dir = (to-from).Normalized();
+		var clockwise_dir = new Vector2(-dir.Y, dir.X);
 		
 		var normal = clockwise_dir;
-		if(element.HasAttribute("NormalX")) normal.x = element.GetFloatAttribute("NormalX");
-		if(element.HasAttribute("NormalY")) normal.y = element.GetFloatAttribute("NormalY");
-		var normal_start = (@from+to)/2f;
+		if(element.HasAttribute("NormalX")) normal.X = element.GetFloatAttribute("NormalX");
+		if(element.HasAttribute("NormalY")) normal.Y = element.GetFloatAttribute("NormalY");
+		var normal_start = (from+to)/2f;
 		var normal_end = normal_start + cf.Sizes["NormalLength"] * normal;
 		
-		DrawAction action = (ci) => ci?.DrawLine(@from, to, color);
+		DrawAction action = (ci) => ci?.DrawLine(from, to, color);
 		
 		if(cf.Display["CollisionNormals"])
 			action = action.Chain((ci) => ci?.DrawLine(normal_start, normal_end, cf.Colors["NormalLine"]));
@@ -411,8 +411,8 @@ public class LevelReader
 			action = action.Chain(
 				(ci) =>
 				{
-					ci?.DrawLine(@from+teamoffset, to+teamoffset, teamcolor);
-					ci?.DrawLine(@from-teamoffset, to-teamoffset, teamcolor);
+					ci?.DrawLine(from+teamoffset, to+teamoffset, teamcolor);
+					ci?.DrawLine(from-teamoffset, to-teamoffset, teamcolor);
 				}
 			);
 		}
@@ -420,16 +420,16 @@ public class LevelReader
 		if(cf.Display["TauntEvent"] && element.HasAttribute("TauntEvent"))
 		{
 			var tauntevent = element.GetAttribute("TauntEvent");
-			var labelPos = new Vector2(Math.Min(@from.x, to.x), Math.Min(@from.y, to.y));
+			var labelPos = new Vector2(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y));
 			action = action.Chain(
-				(ci) => ci?.DrawString(font, labelPos + cf.Sizes["CollisionTauntEventOffset"]*Vector2.Up, $"TauntEvent: {tauntevent}")
+				(ci) => ci?.DrawString(font, labelPos + cf.Sizes["CollisionTauntEventOffset"]*Vector2.Up, $"TauntEvent: {tauntevent}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32())
 			);
 		}
 		
 		if(cf.Display["Anchors"] && element.HasAttribute("AnchorX") && element.HasAttribute("AnchorY"))
 		{
 			var anchor = element.GetElementPosition("Anchor");
-			var more_transparent = new Color(color.r, color.g, color.b, 0.3f);
+			var more_transparent = new Color(color.R, color.G, color.B, 0.3f);
 			action = action.Chain(
 				(ci) => ci?.DrawCircle(anchor, cf.Sizes["AnchorRadius"], more_transparent)
 			);
@@ -458,9 +458,9 @@ public class LevelReader
 	
 	public DrawAction GenerateGenericPressurePlateCollisionAction(XElement element, Vector2 offset, Color color)
 	{
-		(var @from, var to) = element.GetElementPoints();
-		@from += offset; to += offset;
-		var labelPos = new Vector2(Math.Min(@from.x, to.x), Math.Min(@from.y, to.y));
+		(var from, var to) = element.GetElementPoints();
+		from += offset; to += offset;
+		var labelPos = new Vector2(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y));
 		var powers = element.GetAttribute("TrapPowers").Replace(",", " ");
 		var cooldown = element.GetIntAttribute("Cooldown");
 		
@@ -469,17 +469,17 @@ public class LevelReader
 		
 		var fireoffset = element.GetElementPosition("FireOffset");
 		
-		var middle = (@from+to)/2f;
+		var middle = (from+to)/2f;
 		var firePos = fireoffset + offset;
 		
 		var action =  GenerateGenericCollisionAction(element, offset, color);
 
 		if(cf.Display["TrapPowers"]) action = action.Chain(
-			(ci) => ci?.DrawString(font, firePos + cf.Sizes["PressurePlatePowerOffset"]*Vector2.Up, $"Powers: {powers}")
+			(ci) => ci?.DrawString(font, firePos + cf.Sizes["PressurePlatePowerOffset"]*Vector2.Up, $"Powers: {powers}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32())
 		);
 
 		if(cf.Display["TrapCooldown"]) action = action.Chain(
-			(ci) => ci?.DrawString(font, labelPos + cf.Sizes["PressurePlateCooldownOffset"]*Vector2.Up, $"Cooldown: {cooldown}f")
+			(ci) => ci?.DrawString(font, labelPos + cf.Sizes["PressurePlateCooldownOffset"]*Vector2.Up, $"Cooldown: {cooldown}f", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32())
 		);
 
 		if(cf.Display["TrapPowerOffset"]) action = action.Chain(
@@ -540,7 +540,7 @@ public class LevelReader
 		return (ci) =>
 		{
 			ci?.DrawCircle(pos, cf.Sizes["NavnodeRadius"], cf.Colors[$"Navnode{type}"]);
-			ci?.DrawString(font, pos + cf.Sizes["NavnodeIDOffset"]*Vector2.Up, $"NavID: {navid}");
+			ci?.DrawString(font, pos + cf.Sizes["NavnodeIDOffset"]*Vector2.Up, $"NavID: {navid}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32());
 		};
 	}
 	
@@ -624,10 +624,12 @@ public class LevelReader
 
 		if(texture is null) return EMPTY_ACTION;
 
-		trans = trans.Translated(offset);
+		//move
+		trans = trans.TranslatedLocal(offset);
 
-		if(bounds.x < 0f) trans.Scale *= new Vector2(-1,1);
-		if(bounds.y < 0f) trans.Scale *= new Vector2(1,-1);
+		//flip if negative width/height
+		if(bounds.X < 0f) trans = trans.ScaledLocal(new Vector2(-1,1));
+		if(bounds.Y < 0f) trans = trans.ScaledLocal(new Vector2(1,-1));
 		
 		return (ci) =>
 		{
@@ -652,16 +654,17 @@ public class LevelReader
 		instanceNameCounter[instanceName]++;
 		instanceName = instanceNameCounter[instanceName].ToString() + "_" + instanceName;
 		
-		trans = trans.Translated(element.GetElementPositionOrDefault());
-		
-		trans.Scale *=
-		new Vector2(
-			element.GetFloatAttribute("ScaleX", 1),
-			element.GetFloatAttribute("ScaleY", 1)
-		)*element.GetFloatAttribute("Scale", 1);
-		
-		trans.Rotation += Mathf.Deg2Rad(element.GetFloatAttribute("Rotation"));
-		
+		trans = trans
+		.TranslatedLocal(//move
+			element.GetElementPositionOrDefault()
+		)
+		.ScaledLocal(//scale
+			element.GetElementPositionOrDefault("Scale",1)*element.GetFloatAttribute("Scale", 1)
+		)
+		.RotatedLocal(//rotate
+			Mathf.DegToRad(element.GetFloatAttribute("Rotation"))
+		);
+
 		if(!element.HasAttribute("AssetName"))
 		{
 			var assetActions = element.Elements("Asset")
@@ -673,7 +676,7 @@ public class LevelReader
 			var actions = assetActions.Concat(platformActions);
 			
 			if(cf.Display["PlatformLabel"])
-			actions = actions.Append((ci) => ci?.DrawString(font, trans.origin, $"InstanceName: {instanceName}"));
+			actions = actions.Append((ci) => ci?.DrawString(font, trans.Origin, $"InstanceName: {instanceName}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32()));
 			
 			return actions.Combine();
 		}
@@ -684,7 +687,7 @@ public class LevelReader
 	{
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		trans = trans.Translated(stepper.GetCurrent()).Translated(element.GetElementPositionOrDefault());
+		trans = trans.TranslatedLocal(stepper.GetCurrent()).TranslatedLocal(element.GetElementPositionOrDefault());
 		
 		return element.Elements()
 					.Where(HasAssetGenerator)
@@ -694,23 +697,38 @@ public class LevelReader
 	
 	public DrawAction GenerateSecondaryMovingPlatformAction(XElement element, Vector2 offset = default)
 	{
+		var animationElement = element.Element("Animation");
 		var platid = element.GetIntAttribute("PlatID");
 		var stepper = movingPlatformsDict[platid];
-		var pos = stepper.GetCurrent() + offset + element.GetElementPositionOrDefault();
+		var hasCenter = animationElement.HasAttribute("CenterX")||animationElement.HasAttribute("CenterY");
+		var center = animationElement.GetElementPositionOrDefault("Center");
+		var originpos = offset + element.GetElementPositionOrDefault();
+		var pos = stepper.GetCurrent() + originpos;
 		
-		if(!cf.Display["MovingPlatformsTime"]) return EMPTY_ACTION;
+		var actions = new List<DrawAction>();
 		
-		return (ci) =>
+		if(cf.Display["MovingPlatformsTime"])
+		actions.Add((ci) => ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32()));
+
+		if(cf.Display["MovingPlatformsPosition"])
+		actions.Add((ci) => ci?.DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]));
+
+		if(cf.Display["ShowCenter"] && hasCenter)
 		{
-			if(cf.Display["MovingPlatformsTime"])
-			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}");
-			
-			if(cf.Display["MovingPlatformsID"])
-			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}");
-			
-			if(cf.Display["MovingPlatformsPosition"])
-			ci?.DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]);
-		};
+			actions.Add((ci) => ci?.DrawCircle(center+originpos, cf.Sizes["CenterRadius"], cf.Colors["Center"]));
+			if(cf.Display["ShowCenterPlatID"])
+			actions.Add((ci) => ci?.DrawString(font,center+originpos+cf.Sizes["CenterPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32()));
+		}
+		
+		var currKeyframe = stepper.GetUsedKeyframe();
+		if(cf.Display["ShowCenter"] && currKeyframe.hasCenter)
+		{
+			actions.Add((ci) => ci?.DrawCircle(currKeyframe.center+originpos, cf.Sizes["CenterRadius"], cf.Colors["Center"]));
+			if(cf.Display["ShowCenterPlatID"])
+			actions.Add((ci) => ci?.DrawString(font,currKeyframe.center+originpos+cf.Sizes["CenterPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32()));
+		}
+
+		return actions.Combine();
 	}
 	
 	public DrawAction GenerateScoreboardAction(XElement element, Transform2D trans = default)
@@ -737,11 +755,11 @@ public class LevelReader
 		var blueOneDigit = new Vector2(blueDouble?oneDigitX:0, blueDouble?digitYDiff:0);
 		var blueTenDigit = new Vector2(tenDigitX, digitYDiff);
 		
-		var redTrans = trans.Translated(new Vector2(redX, y));
-		var blueTrans = trans.Translated(new Vector2(blueX, y));
+		var redTrans = trans.TranslatedLocal(new Vector2(redX, y));
+		var blueTrans = trans.TranslatedLocal(new Vector2(blueX, y));
 		
-		if(!redDouble) blueTrans.Scale /= digitScale;
-		if(!blueDouble) redTrans.Scale /= digitScale;
+		if(!blueDouble) blueTrans = blueTrans.ScaledLocal(Vector2.One/digitScale);
+		if(!redDouble) redTrans = redTrans.ScaledLocal(Vector2.One/digitScale);
 		
 		var redFont = element.GetAttribute("RedDigitFont");
 		var blueFont = element.GetAttribute("BlueDigitFont");
@@ -752,17 +770,17 @@ public class LevelReader
 		var blueOneName = $"Digit{blueOne}_{blueFont}.png";
 		var blueTenName = $"Digit{blueTen}_{blueFont}.png";
 		
+		var blueOnesAction = GenerateBaseAssetAction(blueTrans, blueOneDigit, $"{swfPath}/{blueOneName}");
+		var blueTensAction = blueDouble?GenerateBaseAssetAction(blueTrans, blueTenDigit, $"{swfPath}/{blueTenName}"):EMPTY_ACTION;
+		var redOnesAction = GenerateBaseAssetAction(redTrans, redOneDigit, $"{swfPath}/{redOneName}");
+		var redTensAction = redDouble?GenerateBaseAssetAction(redTrans, redTenDigit, $"{swfPath}/{redTenName}"):EMPTY_ACTION;
+
 		return (ci) =>
 		{
-			GenerateBaseAssetAction(redTrans, redOneDigit, $"{swfPath}/{redOneName}")(ci);
-			
-			if(redDouble)
-				GenerateBaseAssetAction(redTrans, redTenDigit, $"{swfPath}/{redTenName}")(ci);
-			
-			GenerateBaseAssetAction(blueTrans, blueOneDigit, $"{swfPath}/{blueOneName}")(ci);
-			
-			if(blueDouble)
-				GenerateBaseAssetAction(blueTrans, blueTenDigit, $"{swfPath}/{blueTenName}")(ci);
+			blueOnesAction(ci);
+			blueTensAction(ci);
+			redOnesAction(ci);
+			redTensAction(ci);
 		};
 	}
 	
@@ -779,15 +797,15 @@ public class LevelReader
 		DrawAction dynAct = cf.Display["MovingPlatformData"]?((ci) =>
 		{
 			if(cf.Display["MovingPlatformsTime"])
-			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}");
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformTimeOffset"]*Vector2.Up, $"Time: {stepper.time}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32());
 			
 			if(cf.Display["MovingPlatformsID"])
-			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}");
+			ci?.DrawString(font, pos + cf.Sizes["MovingPlatformPlatIDOffset"]*Vector2.Up, $"PlatID: {platid}", modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32());
 			
 			if(cf.Display["MovingPlatformsPosition"])
 			ci?.DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]);
 		}):EMPTY_ACTION;
-		
+
 		return element.Elements()
 					.Where(HasGenerator)
 					.Select(e => GetGenerator(e)(e,pos))

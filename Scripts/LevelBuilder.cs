@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-public class LevelBuilder : Node2D
+public partial class LevelBuilder : Node2D
 {
 	//initial speed of the moving platforms
 	public float speed = 0.05f;
@@ -31,7 +31,7 @@ public class LevelBuilder : Node2D
 		camera = GetNode<NavigationCamera>("Camera");
 		speed = baseSpeed;
 		fd = GetNode<FileDialog>("CanvasLayer/FileDialog");
-		fd.Popup_();
+		fd.Popup();
 		displayLabel = GetNode<Label>("CanvasLayer/DisplayLabel");
 		displayLabelAnimationPlayer = displayLabel.GetNode<AnimationPlayer>("DisplayLabelAnimationPlayer");
 	}
@@ -43,7 +43,7 @@ public class LevelBuilder : Node2D
 		displayLabelAnimationPlayer.Play("Fade");
 	}
 	
-	public override void _PhysicsProcess(float delta)
+	public override void _PhysicsProcess(double delta)
 	{
 		if(Input.IsActionJustPressed("toggle_precision")) {precise = !precise; Display($"Input: {(precise?"Tap":"Hold")}");}
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; Display($"{(paused?"P":"Unp")}aused");}
@@ -52,50 +52,58 @@ public class LevelBuilder : Node2D
 		if(inputChecker("increase_speed")) {speed += speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 		if(inputChecker("decrease_speed")) {speed -= speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 		
-		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%(ulong)updateFreq == 0) Update();
+		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%(ulong)updateFreq == 0) QueueRedraw();
 	}
 	
-	public override void _Process(float delta)
+	public override void _Process(double delta)
 	{
 		if(Input.IsActionJustPressed("full_reload"))
 		{
 			configReader.Load(configReader.FilePath);
 			SetSettings();
 			levelreader = new LevelReader(configReader);
-			Update();
+			QueueRedraw();
 		}
 		
 		if(Input.IsActionJustPressed("clear_cache"))
 		{
 			levelreader.instanceNameCounter.Clear();
 			Utils.Cache.Clear();
-			Update();
+			QueueRedraw();
 		}
 
 		if(Input.IsActionJustPressed("toggle_no_skulls"))
 		{
 			levelreader.noSkulls = !levelreader.noSkulls;
-			Update();
+			QueueRedraw();
 		}
 		
 		if(Input.IsActionJustPressed("reset_time"))
 		{
 			levelreader.ResetTime();
-			Update();
+			QueueRedraw();
 		}
 		
 		//so shit works during pause
-		if(Input.IsActionJustPressed("fit_camera")||Input.IsActionJustPressed("fit_blastzones")||inputChecker("forward_once")||inputChecker("back_once")) Update();
+		if(Input.IsActionJustPressed("fit_camera")||Input.IsActionJustPressed("fit_blastzones")||inputChecker("forward_once")||inputChecker("back_once")) QueueRedraw();
 		
-		if(Input.IsActionJustPressed("toggle_fullscreen")) OS.WindowFullscreen = !OS.WindowFullscreen;
+		if(Input.IsActionJustPressed("toggle_fullscreen"))
+			DisplayServer.WindowSetMode(
+				DisplayServer.WindowGetMode() switch
+				{
+					DisplayServer.WindowMode.ExclusiveFullscreen or DisplayServer.WindowMode.Fullscreen => DisplayServer.WindowMode.Windowed,
+					_ => DisplayServer.WindowMode.Fullscreen
+				}
+			);
+
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
 	}
 	
 	public void TakeScreenshot()
 	{
-		var image = GetViewport().GetTexture().GetData();
-		if(image is null) GD.PushError("Viewport texture data is null!!! Complain to cheese.");
+		var image = GetViewport().GetTexture().GetImage();
+		if(image is null) GD.PushError("SubViewport texture data is null!!! Complain to cheese.");
 		else
 		{
 			image.FlipY();
@@ -114,22 +122,23 @@ public class LevelBuilder : Node2D
 		levelreader.GenerateDrawAction(mult*speed*updateFreq)(this);
 	}
 	
-	public void _on_FileDialog_file_selected(string path)
+	public void _on_file_dialog_file_selected(string path)
 	{
+		fd.Visible = false;
 		fd.QueueFree();
 		configReader = new ConfigReader();
 		configReader.Load(path);
 		SetSettings();
 		levelreader = new LevelReader(configReader);
 		camera.cf = configReader;
-		Update();
+		QueueRedraw();
 	}
 	
 	public void SetSettings()
 	{
-		baseSpeed = Convert.ToSingle(configReader.Others["BaseSpeed"]);
+		baseSpeed = configReader.Others["BaseSpeed"].AsSingle();
 		speed = baseSpeed;
-		speedInc = Convert.ToSingle(configReader.Others["SpeedIncrement"]);
-		updateFreq = int.Parse(configReader.Others["UpdateFreq"].ToString());
+		speedInc = configReader.Others["SpeedIncrement"].AsSingle();
+		updateFreq = configReader.Others["UpdateFreq"].AsInt32();
 	}
 }

@@ -6,16 +6,7 @@ using System.Linq;
 
 public static class Utils
 {
-	public const bool filter = false;
-	public const bool mipmap = false;
-	public const bool repeat = true;
-	public const int interpol = 4;//choose in range [1,4]. higher number- better result
-	
-	public static uint Filter => (filter)?0b100:0;
-	public static uint Mipmap => (mipmap)?0b010:0;
-	public static uint Repeat => (filter)?0b001:0;
-	
-	public static Dictionary<(string, string), ImageTexture> Cache = new Dictionary<(string, string), ImageTexture>();
+	public static Dictionary<(string, string), ImageTexture> Cache = new();
 	
 	public static string GetSubElementValue(this XElement element, string elementValue, string @default = "") => element.Element(elementValue)?.Value ?? @default;
 	public static float GetFloatSubElementValue(this XElement element, string elementValue, float @default = 0f) => float.Parse(element.GetSubElementValue(elementValue, $"{@default}"));
@@ -60,10 +51,10 @@ public static class Utils
 		return new Vector2(w, h);
 	}
 	
-	public static Vector2 GetElementPositionOrDefault(this XElement element, string prefix = "")
+	public static Vector2 GetElementPositionOrDefault(this XElement element, string prefix = "", float @default=0)
 	{
-		var x = float.Parse(element.GetAttribute($"{prefix}X", "0"));
-		var y = float.Parse(element.GetAttribute($"{prefix}Y", "0"));
+		var x = float.Parse(element.GetAttribute($"{prefix}X", @default.ToString()));
+		var y = float.Parse(element.GetAttribute($"{prefix}Y", @default.ToString()));
 		return new Vector2(x, y);
 	}
 	
@@ -111,7 +102,7 @@ public static class Utils
 	{
 		var pos = element.GetElementPosition();
 		var bounds = element.GetElementBoundsOrDefault();
-		return new Rect2(pos.x, pos.y, bounds.x, bounds.y);
+		return new Rect2(pos.X, pos.Y, bounds.X, bounds.Y);
 	}
 	
 	public static Action<T> Chain<T>(this Action<T> a, Action<T> b) => (t) => {a(t); b(t);};
@@ -122,14 +113,13 @@ public static class Utils
 	public static object Identity(object o) => Identity<object>(o);
 	
 	public static IEnumerable<Keyframe> GetElementKeyframes(this XElement element, float mult, bool hasCenter, Vector2 center) => 
-		element.Elements().SelectMany(a => {
-			switch(a.Name.LocalName)
+		element.Elements().SelectMany(a =>
+			a.Name.LocalName switch
 			{
-				case "KeyFrame": return a.GetKeyframe(mult, hasCenter, center, 0);
-				case "Phase": return a.GetPhase(mult, hasCenter, center);
-				default: return null;
+				"KeyFrame" => a.GetKeyframe(mult, hasCenter, center, 0),
+				"Phase" => a.GetPhase(mult, hasCenter, center),
+				_ => null
 			}
-		}
 	);
 	
 	public static IEnumerable<Keyframe> GetPhase(this XElement element, float mult, bool hasCenter, Vector2 center)
@@ -171,8 +161,8 @@ public static class Utils
 		
 		GD.Print($"Loading {path}" + ((instanceName == "")?"":$" with instance {instanceName}"));
 		
-		var image = new Image();
-		var er = image.Load(path);
+		var image = Image.LoadFromFile(path);
+		var er = Error.Ok;
 		if(er != Error.Ok) 
 		{
 			GD.PushError($"Got error {er} while attempting to load image from path {path}");
@@ -180,29 +170,22 @@ public static class Utils
 			return null;
 		}
 		
-		if(bounds.x == 0f) bounds.x = image.GetWidth();
-		if(bounds.y == 0f) bounds.y = image.GetHeight();
+		if(bounds.X == 0f) bounds.X = image.GetWidth();
+		if(bounds.Y == 0f) bounds.Y = image.GetHeight();
 		
 		bounds = bounds.Abs();
 
-		image.Resize((int)bounds.x, (int)bounds.y, (Image.Interpolation)interpol);
+		image.Resize((int)bounds.X, (int)bounds.Y);
 		
-		var texture = new ImageTexture();
-		texture.CreateFromImage(image, Filter | Mipmap | Repeat);
+		var texture = ImageTexture.CreateFromImage(image);
 		Cache.Add((path,instanceName), texture);
 		return texture;
 	}
 	
-	public static Vector2 Center(this Rect2 rec) => new Vector2(
-		rec.Position.x + rec.Size.x / 2f,
-		rec.Position.y + rec.Size.y / 2f
-	);
-	
 	public static string Read(string filepath)
 	{
-		var f = new File();//create new file
-		var er = f.Open(filepath, File.ModeFlags.Read);//open file
-		
+		var f = FileAccess.Open(filepath, FileAccess.ModeFlags.Read);
+		var er = FileAccess.GetOpenError();
 		if(er != Error.Ok)
 		{
 			GD.PushError($"Error {er} while reading file {filepath}");
