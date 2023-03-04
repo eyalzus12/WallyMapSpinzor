@@ -422,6 +422,7 @@ public class LevelReader
 			var rad = cf.Sizes["DefaultAreaRadius"];
 			var newrect = new Rect2(rect.Position - rad*Vector2.One, 2f*rad*Vector2.One);
 			DrawRect(newrect, color, false);
+			DrawCircle(rect.Position, rad/2f, color);
 		}
 		//if line
 		else if(rect.Size.X == 0 || rect.Size.Y == 0)
