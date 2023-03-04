@@ -1,23 +1,8 @@
 using Godot;
 using System;
 
-public struct Keyframe
+public record struct Keyframe(float frame, float numframes, Vector2 position, bool hasCenter, Vector2 center)
 {
-	public readonly float frame;
-	public readonly Vector2 position;
-	public readonly bool hasCenter;
-	public readonly Vector2 center;
-	public readonly float numframes;
-	
-	public Keyframe(float frame, float numframes, Vector2 position, bool hasCenter, Vector2 center)
-	{
-		this.frame = frame;
-		this.numframes = numframes;
-		this.position = position;
-		this.hasCenter = hasCenter;
-		this.center = center;
-	}
-	
 	public Vector2 StepTowards(Keyframe other, float time)
 	{
 		var framediff = other.frame - frame;

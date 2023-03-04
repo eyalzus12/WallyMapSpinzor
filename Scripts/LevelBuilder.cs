@@ -45,6 +45,8 @@ public partial class LevelBuilder : Node2D
 	
 	public override void _PhysicsProcess(double delta)
 	{
+		bool shouldRedraw = false;
+
 		if(Input.IsActionJustPressed("toggle_precision")) {precise = !precise; Display($"Input: {(precise?"Tap":"Hold")}");}
 		if(Input.IsActionJustPressed("pause")) {paused = !paused; Display($"{(paused?"P":"Unp")}aused");}
 		if(Input.IsActionJustPressed("reset_speed")) {speed = baseSpeed; Display($"Speed {Math.Round(speed,roundSpeed)}");}
@@ -52,40 +54,38 @@ public partial class LevelBuilder : Node2D
 		if(inputChecker("increase_speed")) {speed += speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 		if(inputChecker("decrease_speed")) {speed -= speedInc; Display($"Speed {Math.Round(speed,roundSpeed)}");}
 		
-		if(speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%(ulong)updateFreq == 0) QueueRedraw();
+		if(inputChecker("increase_red_score")){levelreader.redCount++;shouldRedraw=true;}
+		if(inputChecker("decrease_red_score")){levelreader.redCount--;shouldRedraw=true;}
+		if(inputChecker("increase_blue_score")){levelreader.blueCount++;shouldRedraw=true;}
+		if(inputChecker("decrease_blue_score")){levelreader.blueCount--;shouldRedraw=true;}
+		
+		if(shouldRedraw || (speed != 0f && !paused && updateFreq != 0 && Engine.GetPhysicsFrames()%(ulong)updateFreq == 0)) QueueRedraw();
 	}
 	
 	public override void _Process(double delta)
 	{
+		bool shouldRedraw = false;
+
 		if(Input.IsActionJustPressed("full_reload"))
 		{
 			configReader.Load(configReader.FilePath);
 			SetSettings();
-			levelreader = new LevelReader(configReader);
-			QueueRedraw();
+			levelreader = new LevelReader(this, configReader);
+			shouldRedraw = true;
 		}
 		
 		if(Input.IsActionJustPressed("clear_cache"))
-		{
-			levelreader.instanceNameCounter.Clear();
-			Utils.Cache.Clear();
-			QueueRedraw();
-		}
+		{levelreader.instanceNameCounter.Clear();Utils.Cache.Clear();shouldRedraw = true;}
 
 		if(Input.IsActionJustPressed("toggle_no_skulls"))
-		{
-			levelreader.noSkulls = !levelreader.noSkulls;
-			QueueRedraw();
-		}
+		{levelreader.noSkulls = !levelreader.noSkulls;shouldRedraw = true;}
 		
 		if(Input.IsActionJustPressed("reset_time"))
-		{
-			levelreader.ResetTime();
-			QueueRedraw();
-		}
+		{levelreader.ResetTime();shouldRedraw = true;}
 		
 		//so shit works during pause
-		if(Input.IsActionJustPressed("fit_camera")||Input.IsActionJustPressed("fit_blastzones")||inputChecker("forward_once")||inputChecker("back_once")) QueueRedraw();
+		if(Input.IsActionJustPressed("fit_camera")||Input.IsActionJustPressed("fit_blastzones")||inputChecker("forward_once")||inputChecker("back_once"))
+			shouldRedraw = true;
 		
 		if(Input.IsActionJustPressed("toggle_fullscreen"))
 			DisplayServer.WindowSetMode(
@@ -95,6 +95,8 @@ public partial class LevelBuilder : Node2D
 					_ => DisplayServer.WindowMode.Fullscreen
 				}
 			);
+
+		if(shouldRedraw) QueueRedraw();
 
 		if(Input.IsActionJustPressed("screenshot")) TakeScreenshot();
 		if(Input.IsActionJustPressed("exit")) GetTree().Quit();
@@ -119,7 +121,7 @@ public partial class LevelBuilder : Node2D
 	{
 		if(levelreader is null) return;
 		var mult = inputChecker("forward_once")?1:inputChecker("back_once")?-1:paused?0:1;
-		levelreader.GenerateDrawAction(mult*speed*updateFreq)(this);
+		levelreader.DrawAll(mult*speed*updateFreq);
 	}
 	
 	public void _on_file_dialog_file_selected(string path)
@@ -129,7 +131,7 @@ public partial class LevelBuilder : Node2D
 		configReader = new ConfigReader();
 		configReader.Load(path);
 		SetSettings();
-		levelreader = new LevelReader(configReader);
+		levelreader = new LevelReader(this, configReader);
 		camera.cf = configReader;
 		QueueRedraw();
 	}

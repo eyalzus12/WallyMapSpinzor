@@ -16,7 +16,7 @@ public static class Utils
 	public static string GetAttribute(this XElement element, string attribute, string @default = "")
 	{
 		if(!element.HasAttribute(attribute)) return @default;
-		return element.Attributes(attribute).First().Value.Trim('\u202c');
+		return element.Attribute(attribute).Value.Trim('\u202c');
 	}
 	
 	public static bool GetBooleanAttribute(this XElement element, string attribute, bool @default = false)
@@ -53,15 +53,15 @@ public static class Utils
 	
 	public static Vector2 GetElementPositionOrDefault(this XElement element, string prefix = "", float @default=0)
 	{
-		var x = float.Parse(element.GetAttribute($"{prefix}X", @default.ToString()));
-		var y = float.Parse(element.GetAttribute($"{prefix}Y", @default.ToString()));
+		var x = element.GetFloatAttribute($"{prefix}X", @default);
+		var y = element.GetFloatAttribute($"{prefix}Y", @default);
 		return new Vector2(x, y);
 	}
 	
 	public static Vector2 GetElementBoundsOrDefault(this XElement element)
 	{
-		var w = float.Parse(element.GetAttribute("W", "0"));
-		var h = float.Parse(element.GetAttribute("H", "0"));
+		var w = element.GetFloatAttribute("W", 0);
+		var h = element.GetFloatAttribute("H", 0);
 		return new Vector2(w, h);
 	}
 	
@@ -102,15 +102,8 @@ public static class Utils
 	{
 		var pos = element.GetElementPosition();
 		var bounds = element.GetElementBoundsOrDefault();
-		return new Rect2(pos.X, pos.Y, bounds.X, bounds.Y);
+		return new Rect2(pos, bounds);
 	}
-	
-	public static Action<T> Chain<T>(this Action<T> a, Action<T> b) => (t) => {a(t); b(t);};
-	public static Action<object> Chain(this Action<object> a, Action<object> b) => a.Chain<object>(b);
-	public static Action<T> Combine<T>(this IEnumerable<Action<T>> e) => (t) => e.ForEach(a => a(t));
-	public static Action<object> Combine(this IEnumerable<Action<object>> e) => e.Combine<object>();
-	public static T Identity<T>(T t) => t;
-	public static object Identity(object o) => Identity<object>(o);
 	
 	public static IEnumerable<Keyframe> GetElementKeyframes(this XElement element, float mult, bool hasCenter, Vector2 center) => 
 		element.Elements().SelectMany(a =>
@@ -149,20 +142,13 @@ public static class Utils
 	{
 		foreach(var e in enumerable) action(e);
 	}
-	
-	public static void ForEach(this IEnumerable<object> enumerable, Action<object> action) => enumerable.ForEach<object>(action);
-	
-	public static void Finalize<T>(this IEnumerable<T> enumerable) => enumerable.ForEach<T>((t) => {});
-	public static void Finalize(this IEnumerable<object> enumerable) => enumerable.Finalize<object>();
-	
+		
 	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds)
 	{
 		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];
-		
-		GD.Print($"Loading {path}" + ((instanceName == "")?"":$" with instance {instanceName}"));
-		
-		var image = Image.LoadFromFile(path);
-		var er = Error.Ok;
+		if(OS.HasFeature("editor")) GD.Print($"Loading {path}" + ((instanceName == "")?"":$" with instance {instanceName}"));
+		var image = new Image();
+		var er = image.Load(path);
 		if(er != Error.Ok) 
 		{
 			GD.PushError($"Got error {er} while attempting to load image from path {path}");
