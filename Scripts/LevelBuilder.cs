@@ -108,8 +108,6 @@ public partial class LevelBuilder : Node2D
 		if(image is null) GD.PushError("SubViewport texture data is null!!! Complain to cheese.");
 		else
 		{
-			image.FlipY();
-
 			var path = configReader.Paths["ScreenshotOutput"];
 			if(!path.EndsWith("/"))path+="/";
 
