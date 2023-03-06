@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Xml.Linq;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 public static class Utils
 {
@@ -142,7 +143,29 @@ public static class Utils
 	{
 		foreach(var e in enumerable) action(e);
 	}
+	
+	public static ImageTexture LoadImageFromSWF(string dir, string name)
+	{
+		if(Cache.ContainsKey((name,""))) return Cache[(name,"")];
+
+		var swfdir = DirAccess.Open(dir);
+		var er = DirAccess.GetOpenError();
+		if(er != Error.Ok)
+		{
+			GD.PushError($"Got error {er} while attempting to open dir {dir}");
+			Cache.Add((name,""), null);
+			return null;
+		}
+		var dirs = swfdir.GetDirectories();
+		var regex = new Regex($@"^DefineSprite_\d*_a_{name}$", RegexOptions.Compiled);
+		var desiredDir = dirs.Where(d => regex.IsMatch(d)).First();
+		var fullpath = $"{dir}/{desiredDir}/1.png";
 		
+		var texture = LoadImageFromPath(fullpath, "", default);
+		Cache.Add((name,""), texture);
+		return texture;
+	}
+
 	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds)
 	{
 		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];

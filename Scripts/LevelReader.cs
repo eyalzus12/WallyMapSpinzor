@@ -24,6 +24,7 @@ public class LevelReader
 	public Dictionary<string, Generator> generators = new();
 	public Dictionary<string, AssetGenerator> assetGenerators = new();
 	public Dictionary<int, KeyframeStepper> movingPlatformsDict = new();
+	public Dictionary<int, XElement> movingPlatformsElementDict = new();
 	public Dictionary<int, Vector2> navnodesPositions = new();
 	public Dictionary<string, int> instanceNameCounter = new();
 	public DumbPriorityQueue<Action> draws = new(PRIORITY_COUNT);
@@ -70,26 +71,16 @@ public class LevelReader
 		callCount = 0;
 
 		//load paths
-		mapFolder = cf.Paths["LevelsFolder"];
-		if(!mapFolder.EndsWith("/"))mapFolder+="/";
-
+		mapFolder = cf.Paths["LevelsFolder"] + "/";
 		mapName = cf.Paths["LevelName"];
-
 		levelTypesPath = cf.Paths["LevelTypes"];
-
-		mapArtPath = cf.Paths["MapArt"];
-		if(!mapArtPath.EndsWith("/"))mapArtPath+="/";
-
-		swfPath = cf.Paths["SWFReplacement"];
-		if(!swfPath.EndsWith("/"))swfPath+="/";
+		mapArtPath = cf.Paths["MapArt"] + "/";
 
 		//load some settings
 		redCount = cf.Others["RedScore"].AsInt32();
 		blueCount = cf.Others["BlueScore"].AsInt32();
 		noSkulls = cf.Others["NoSkulls"].AsBool();
-		themes.Clear();themes.Add("");
-		var themesArr = cf.Others["Themes"].AsString().Split(",");
-		foreach(var theme in themesArr) themes.Add(theme.Trim());
+		themes = cf.Others["Themes"].AsString().Split(",").Select(s=>s.Trim()).Append("").ToHashSet();
 		
 		//load font
 		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
@@ -162,6 +153,8 @@ public class LevelReader
 	{
 		assetGenerators.Clear();
 
+		assetGenerators.Add("DynamicCollision", PropagateDynamicCollision);
+
 		if(cf.Display["Assets"])
 		{
 			assetGenerators.Add("Platform", DrawPlatform);
@@ -169,6 +162,9 @@ public class LevelReader
 			
 			if(cf.Display["ScoreboardDigits"])
 			assetGenerators.Add("TeamScoreboard", DrawScoreboard);
+
+			assetGenerators.Add("PressurePlateCollision", DrawHardPressurePlateSprite);
+			assetGenerators.Add("SoftPressurePlateCollision", DrawSoftPressurePlateSprite);
 		}
 		
 		if(cf.Display["Background"]) assetGenerators.Add("Background", DrawBackground);
@@ -394,6 +390,7 @@ public class LevelReader
 
 		//add to dictionary
 		movingPlatformsDict.Add(platid, stepper);
+		movingPlatformsElementDict.Add(platid, element);
 	}
 	
 	//////////////////////////////////////////
@@ -715,7 +712,7 @@ public class LevelReader
 		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", instanceName, bounds, hasSkulls, theme, priority);
 	}
 	
-	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="", int priority=ASSET_PRIORITY)
+	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="", int priority=ASSET_PRIORITY, bool swf=false)
 	{
 		//check for conditionally drawn assets
 		if(
@@ -728,7 +725,7 @@ public class LevelReader
 		) return;
 		
 		//load texture
-		var texture = Utils.LoadImageFromPath(path, instanceName, bounds);
+		var texture = !swf?Utils.LoadImageFromPath(path, instanceName, bounds):Utils.LoadImageFromSWF(cf.Swf["GameModesExport"], path);
 
 		//texture doesn't exist
 		if(texture is null) return;
@@ -837,8 +834,6 @@ public class LevelReader
 		var platid = element.GetIntAttribute("PlatID");
 		//get moving platform position calculator
 		var stepper = movingPlatformsDict[platid];
-		//var hasCenter = animationElement.HasAttribute("CenterX")||animationElement.HasAttribute("CenterY");
-		//var center = animationElement.GetElementPositionOrDefault("Center");
 		//get starting position
 		var originpos = offset + element.GetElementPositionOrDefault();
 		//get current position
@@ -851,13 +846,6 @@ public class LevelReader
 		//display position
 		if(cf.Display["MovingPlatformsPosition"])
 		DrawCircle(pos, cf.Sizes["MovingPlatformRadius"], cf.Colors["MovingPlatform"]);
-
-		/*if(cf.Display["ShowCenter"] && hasCenter)
-		{
-			DrawCircle(center+originpos, cf.Sizes["CenterRadius"], cf.Colors["Center"]);
-			if(cf.Display["CenterPlatID"])
-			DrawString($"PlatID: {platid}", center+originpos+cf.Sizes["CenterPlatIDOffset"]*Vector2.Up);
-		}*/
 		
 		//display current center
 		var currKeyframe = stepper.GetUsedKeyframe();
@@ -928,18 +916,56 @@ public class LevelReader
 		var blueFont = element.GetAttribute("BlueDigitFont");
 		
 		//get file names
-		var redOneName = $"Digit{redOne}_{redFont}.png";
-		var redTenName = $"Digit{redTen}_{redFont}.png";
+		var redOneName = $"Digit{redOne}" + (redFont==""?"":"_") + redFont;
+		var redTenName = $"Digit{redTen}" + (redFont==""?"":"_") + redFont;
 		
-		var blueOneName = $"Digit{blueOne}_{blueFont}.png";
-		var blueTenName = $"Digit{blueTen}_{blueFont}.png";
+		var blueOneName = $"Digit{blueOne}" + (blueFont==""?"":"_") + blueFont;
+		var blueTenName = $"Digit{blueTen}" + (blueFont==""?"":"_") + blueFont;
 		
 		//draw
 		
-		DrawAssetFromData(blueOnesTrans, Vector2.Zero, $"{swfPath}/{blueOneName}", priority: DIGIT_PRIORITY);
-		if(blueDouble)DrawAssetFromData(blueTensTrans, Vector2.Zero, $"{swfPath}/{blueTenName}", priority: DIGIT_PRIORITY);
-		DrawAssetFromData(redOnesTrans, Vector2.Zero, $"{swfPath}/{redOneName}", priority: DIGIT_PRIORITY);
-		if(redDouble)DrawAssetFromData(redTensTrans, Vector2.Zero, $"{swfPath}/{redTenName}", priority: DIGIT_PRIORITY);
+		DrawAssetFromData(blueOnesTrans, Vector2.Zero, blueOneName, priority: DIGIT_PRIORITY, swf:true);
+		if(blueDouble)DrawAssetFromData(blueTensTrans, Vector2.Zero, blueTenName, priority: DIGIT_PRIORITY, swf:true);
+		DrawAssetFromData(redOnesTrans, Vector2.Zero, redOneName, priority: DIGIT_PRIORITY, swf:true);
+		if(redDouble)DrawAssetFromData(redTensTrans, Vector2.Zero, redTenName, priority: DIGIT_PRIORITY, swf:true);
+	}
+
+	public void DrawPressurePlateSprite(XElement element, Transform2D trans = default)
+	{
+		var assetName = element.GetAttribute("AssetName");
+		var trimmedName = assetName.TrimPrefix("a__AnimationPressurePlate");
+		var finalName = "ClimbPressurePlate" + (trimmedName==""?"":"_") + trimmedName;
+		var pos = element.GetElementPositionOrDefault("AnimOffset");
+
+		//handle moving platform
+		if(element.HasAttribute("PlatID"))
+		{
+			var platid = element.GetIntAttribute("PlatID");
+			pos += movingPlatformsDict[platid].GetCurrent() + movingPlatformsElementDict[platid].GetElementPositionOrDefault();
+		}
+
+		//apply rotation for non-horizontal pressure plates
+		var rot = Mathf.DegToRad(element.GetFloatAttribute("AnimRotation"));
+		trans *= new Transform2D(rot,pos);
+
+		//do a funky thing where we move the texture by its center
+		//this is required because bmg
+		var texture = Utils.LoadImageFromSWF(cf.Swf["GameModesExport"], finalName);
+		var offset = -texture.GetSize()/2f;
+
+		DrawAssetFromData(trans, offset, finalName, swf:true);
+	}
+
+	public void DrawHardPressurePlateSprite(XElement element, Transform2D trans = default) => DrawPressurePlateSprite(element, trans);
+	public void DrawSoftPressurePlateSprite(XElement element, Transform2D trans = default) => DrawPressurePlateSprite(element, trans);
+
+
+	//hacky thing to get pressure plates to properly draw
+	public void PropagateDynamicCollision(XElement element, Transform2D trans = default)
+	{
+		element.Elements()
+			.Where(HasAssetGenerator)
+			.ForEach(e => GetAssetGenerator(e)(e,trans));
 	}
 	
 	//////////////////////////////////////////

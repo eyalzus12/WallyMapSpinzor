@@ -8,6 +8,7 @@ public partial class ConfigReader
 	public ConfigFile cf{get; set;} = new();
 	
 	public Dictionary<string, string> Paths{get; set;} = new();
+	public Dictionary<string, string> Swf{get; set;} = new();
 	public Dictionary<string, bool> Display{get; set;} = new();
 	public Dictionary<string, float> Sizes{get; set;} = new();
 	public Dictionary<string, Color> Colors{get; set;} = new();
@@ -26,6 +27,7 @@ public partial class ConfigReader
 	public void StoreVars()
 	{
 		StorePaths();
+		StoreSWF();
 		StoreDisplays();
 		StoreSizes();
 		StoreColors();
@@ -36,6 +38,12 @@ public partial class ConfigReader
 	public void StorePaths()
 	{
 		foreach(var key in cf.GetSectionKeys(PATHS)) Paths[key] = cf.GetValue(PATHS, key).AsString();
+	}
+
+	public const string SWF = "SWF";
+	public void StoreSWF()
+	{
+		foreach(var key in cf.GetSectionKeys(SWF)) Swf[key] = cf.GetValue(SWF, key).AsString();
 	}
 	
 	public const string DISPLAY = "Display";
