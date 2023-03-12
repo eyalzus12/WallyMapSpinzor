@@ -8,13 +8,9 @@ using AssetGenerator = System.Action<System.Xml.Linq.XElement, Godot.Transform2D
 
 public class LevelReader
 {
-	const int PRIORITY_COUNT = 5;
-
-	const int ASSET_PRIORITY = 0;
-	const int DIGIT_PRIORITY = 1;
-	const int DATA_PRIORITY = 2;
-	const int NAVNODE_PRIORITY = 3;
-	const int TEXT_PRIORITY = 4;
+	public enum Dir {Top, Right, Bottom, Left}
+	public enum Path {Close, Far, Any}
+	public enum Priority{Asset, Digit, Data, Navnode, HordePath, Text}
 
 	public LevelBuilder ci;
 	
@@ -27,7 +23,7 @@ public class LevelReader
 	public Dictionary<int, XElement> movingPlatformsElementDict = new();
 	public Dictionary<int, Vector2> navnodesPositions = new();
 	public Dictionary<string, int> instanceNameCounter = new();
-	public DumbPriorityQueue<Action> draws = new(PRIORITY_COUNT);
+	public LinearPriorityQueue<Action> draws = new(Enum.GetNames<Priority>().Length);
 	
 	public int defaultNumFrames;
 	public float defaultSlowMult;
@@ -53,9 +49,21 @@ public class LevelReader
 	public int redCount = 0;
 	public int blueCount = 0;
 	
+	public Dir selectedDir = Dir.Top;
+	private int _selectedPath = 0;
+	public int selectedPath{get => _selectedPath; set => _selectedPath = value%20;}
+	
 	public ConfigReader cf;
 	
 	public Font font;
+
+	public BrawlhallaRandom rng = new();
+
+	public List<List<Vector2>> LeftPaths {get; set;} = new(20);
+	public List<List<Vector2>> RightPaths {get; set;} = new(20);
+	public List<List<Vector2>> TopPaths {get; set;} = new(20);
+	public List<List<Vector2>> BottomPaths {get; set;} = new(20);
+	public List<Rect2> Goals{get; set;}
 	
 	public LevelReader() {}
 	
@@ -91,8 +99,13 @@ public class LevelReader
 		
 		//init generators
 		InitGenerators();
+
+		movingPlatformsDict.Clear();
+		movingPlatformsElementDict.Clear();
 		
 		var firstMap = parsedMapFile.FirstNode as XElement;
+
+		Goals = firstMap.Elements("Goal").Select(e=>e.GetElementRect()).ToList();
 		
 		//get asset dir
 		assetDir = firstMap.GetAttribute("AssetDir");
@@ -113,13 +126,187 @@ public class LevelReader
 		//get defaults
 		defaultNumFrames = firstMap.GetIntAttribute("NumFrames", -1);
 		defaultSlowMult = firstMap.GetFloatAttribute("SlowMult", 1f);
+
+		//init rng
+		rng.Init(cf.Horde["Seed"].AsUInt32());
 		
 		//reset data
 		ResetTime();
 		navnodesPositions.Clear();
 		foreach(var stepper in movingPlatformsDict.Values) stepper.AdvanceTime(globalStartFrame);
+
+		if(Goals.Count > 0) GeneratePaths();
+		selectedDir = Enum.Parse<Dir>(cf.Horde["PathDir"].AsString());
+		selectedPath = cf.Horde["PathIndex"].AsInt32();
 	}
-	
+
+	public void GeneratePaths()
+	{
+		TopPaths.Clear();
+		for(int i = 0; i < 10; ++i) TopPaths.Add(CreatePath(Dir.Top, Path.Close, i));
+		for(int i = 0; i < 10; ++i) TopPaths.Add(CreatePath(Dir.Top, Path.Far, i));
+		LeftPaths.Clear();
+		for(int i = 0; i < 10; ++i) LeftPaths.Add(CreatePath(Dir.Left, Path.Close, i));
+		for(int i = 0; i < 10; ++i) LeftPaths.Add(CreatePath(Dir.Left, Path.Far, i));
+		RightPaths.Clear();
+		for(int i = 0; i < 10; ++i) RightPaths.Add(CreatePath(Dir.Right, Path.Close, i));
+		for(int i = 0; i < 10; ++i) RightPaths.Add(CreatePath(Dir.Right, Path.Far, i));
+		BottomPaths.Clear();
+		for(int i = 0; i < 20; ++i) BottomPaths.Add(CreatePath(Dir.Bottom, Path.Any, i));
+	}
+
+	public List<Vector2> CreatePath(Dir dir, Path path, int index)
+	{
+		index %= 20;
+		var res = new List<Vector2>();
+		var rect = (parsedMapFile?.FirstNode as XElement).Element("CameraBounds").GetElementRect();
+		float jumps;
+		Vector2 point, door, middle1, middle2;
+		switch(dir)
+		{
+			case Dir.Top:
+				jumps = rect.Size.X/10;
+				point = new Vector2(rect.Position.X+index*jumps,rect.Position.Y);
+				door = PickDoor(path, point.X < rect.GetCenter().X);
+				if(rng.Next()%4 == 0)
+				{
+					middle1 = new Vector2(0,1000);
+					var idfk = Mathf.Abs(door.X-point.X) >= rect.Size.X/3;
+					middle1.X = ((point.X>door.X)==idfk)?(door.X+jumps):(door.X-jumps);
+					CreatePathSegment(res, point, middle1, 2, true, true);
+					CreatePathSegment(res, middle1, door, 2);
+				}
+				else
+				{
+					CreatePathSegment(res, point, door, 3, true);
+				}
+				break;
+			case Dir.Right:
+				jumps = rect.Size.Y/10;
+				point = new Vector2(rect.End.X, rect.Position.Y+index*jumps);
+				door = PickDoor(path, false);
+				if(path == Path.Far && rng.Next()%3 == 0)
+				{
+					middle1 = new Vector2(3220,1050);
+					middle2 = new Vector2(2220,850);
+					CreatePathSegment(res, point, middle1, 2, true, true);
+					CreatePathSegment(res, middle1, middle2, 2, false, true);
+					CreatePathSegment(res, middle2, door, 2);
+				}
+				else
+				{
+					middle1 = new Vector2(3220,1300);
+					CreatePathSegment(res, point, middle1, 3, true, true);
+					CreatePathSegment(res, middle1, door, 3);
+				}
+				break;
+			case Dir.Bottom:
+				jumps = rect.Size.X/20;
+				point = new Vector2(rect.Position.X+index*jumps, rect.End.Y+100);
+				var half = rect.Size.X/2;
+				var third = rect.Size.X/3;
+				middle1 = new Vector2(0,2800);
+                middle2 = new Vector2(0,1600);
+				if(point.X < rect.Position.X+third)
+				{
+					door = PickDoor(Path.Close, true);
+					middle1.X = -650;
+					middle2.X = -550;
+				}
+				else if(point.X > rect.End.X-third)
+				{
+					door = PickDoor(Path.Close, false);
+					middle1.X = 3320;
+					middle2.X = 3220;
+				}
+				else
+				{
+					door = PickDoor(Path.Close, point.X < rect.Position.X+half);
+					var chance50 = rng.Next()%2==0;
+					var chance25 = rng.Next()%4==0;
+					if(chance50)
+					{
+						middle1.X = 1201;
+						middle2.X = chance25?1461:1201;
+					}
+					else
+					{
+						middle1.X = 1461;
+						middle2.X = chance25?1201:1461;
+					}
+				}
+
+				CreatePathSegment(res, point, middle1, 3, true, true);
+				CreatePathSegment(res, middle1, middle2, 3, false, true);
+				CreatePathSegment(res, middle2, door, 3);
+				break;
+			case Dir.Left:
+				jumps = rect.Size.Y/10;
+				point = new Vector2(rect.Position.X, rect.Position.Y+index*jumps);
+				door = PickDoor(path,true);
+				if(path == Path.Far && rng.Next()%3 == 0)
+				{
+					middle1 = new Vector2(-550,1050);
+                    middle2 = new Vector2(1450,850);
+                    CreatePathSegment(res,point,middle1,2,true,true);
+                    CreatePathSegment(res,middle1,middle2,2,false,true);
+                    CreatePathSegment(res,middle2,door,2);
+				}
+				else
+				{
+					middle1 = new Vector2(-550,1300);
+                    CreatePathSegment(res,point,middle1,3,true,true);
+                    CreatePathSegment(res,middle1,door,3);
+				}
+				break;
+		}
+		return res;
+	}
+
+	public Vector2 PickDoor(Path path, bool leftSide)
+	{
+		uint index;
+		
+		if(path == Path.Any) index = rng.Next()%(uint)Goals.Count;
+		else if(leftSide == (path == Path.Close)) index = 0;
+		else index = 1;
+		
+		return Goals[(int)index].GetCenter();
+	}
+
+	public void CreatePathSegment(List<Vector2> path, Vector2 from, Vector2 to, int parts, bool first=false, bool middle=false)
+	{
+		if(first)
+		{
+			path.Add(from);
+		}
+
+		for(int i = 0; i < parts; ++i)
+		{
+			var fromcopy = from;
+			var div = 1f/(parts-i);
+			var thing = div*(to-fromcopy);
+			var point = thing+fromcopy;
+			if(i == parts-1 && !middle)
+			{
+				fromcopy = to;
+			}
+			else
+			{
+				var sign = new Vector2(thing.X>=0?1:-1, thing.Y>=0?1:-1);
+				thing = thing.Abs();
+				if(thing.X<15)thing.X = 15;
+				else if(thing.X>150)thing.X = 150;
+				if(thing.Y<15)thing.Y=15;
+				else if(thing.Y>150)thing.Y=150;
+				thing *= sign;
+				fromcopy.X = point.X-thing.X+rng.Next()%(thing.X*2);
+				fromcopy.Y = point.Y-thing.Y+rng.Next()%(thing.Y*2);
+			}
+			path.Add(fromcopy);
+		}
+	}
+
 	public void LoadExtraAssets()
 	{
 		var first = parsedMapFile?.FirstNode as XElement;
@@ -276,12 +463,12 @@ public class LevelReader
 		
 		//draw navmesh
 		if(cf.Display["Navmesh"]) DrawNavMesh(first);
-		
-		
 
+		//draw horde paths
+		if(cf.Horde["ShowPath"].AsBool()) DrawHordePath(selectedDir, selectedPath);
+		
 		//draw anything that was delayed (text and asset positions)
-		while(!draws.Empty)
-			draws.Dequeue()();
+		while(!draws.Empty) draws.Dequeue()();
 
 		callCount++;
 	}
@@ -296,41 +483,41 @@ public class LevelReader
 	public void AdvanceTime(float time) => movingPlatformsDict.Values.ForEach(s => s.AdvanceTime(time));
 	
 	//store a delayed action for drawing a text and its outline
-	public void DrawString(string text, Vector2 pos, int priority=TEXT_PRIORITY) => 
+	public void DrawString(string text, Vector2 pos, Priority priority=Priority.Text) => 
 		draws.Enqueue(()=>
 		{
 			ci?.DrawString(font, pos, text, modulate: cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32());
 			ci?.DrawStringOutline(font, pos, text, modulate: new Color(0,0,0,1)*cf.Colors["LabelModulate"], fontSize: cf.Others["FontSize"].AsInt32(), size: 5);
-		}, priority);
+		}, (int)priority);
 
-	public void DrawCircle(Vector2 pos, float rad, Color color, int priority=DATA_PRIORITY) =>
+	public void DrawCircle(Vector2 pos, float rad, Color color, Priority priority=Priority.Data) =>
 		draws.Enqueue(() =>
 			ci?.DrawCircle(pos,rad,color),
-			priority
+			(int)priority
 		);
 
-	public void DrawLine(Vector2 from, Vector2 to, Color color, int priority=DATA_PRIORITY) =>
+	public void DrawLine(Vector2 from, Vector2 to, Color color, Priority priority=Priority.Data) =>
 		draws.Enqueue(() =>
 			ci?.DrawLine(from,to,color),
-			priority
+			(int)priority
 		);
 
-	public void DrawRect(Rect2 rect, Color color, bool filled, int priority=DATA_PRIORITY) => DrawRect(rect,color,filled,Transform2D.Identity,priority);
-	public void DrawRect(Rect2 rect, Color color, bool filled, Transform2D trans, int priority=DATA_PRIORITY) =>
+	public void DrawRect(Rect2 rect, Color color, bool filled, Priority priority=Priority.Data) => DrawRect(rect,color,filled,Transform2D.Identity,priority);
+	public void DrawRect(Rect2 rect, Color color, bool filled, Transform2D trans, Priority priority=Priority.Data) =>
 		draws.Enqueue(() => 
 		{
 			ci?.DrawSetTransformMatrix(trans);
 			ci?.DrawRect(rect,color,filled);
 			ci?.DrawSetTransformMatrix(Transform2D.Identity);
-		},priority);
+		}, (int)priority);
 	
-	public void DrawTexture(Texture2D texture, Transform2D trans, int priority = ASSET_PRIORITY) =>
+	public void DrawTexture(Texture2D texture, Transform2D trans, Priority priority = Priority.Asset) =>
 		draws.Enqueue(() => 
 		{
 			ci?.DrawSetTransformMatrix(trans);
 			ci?.DrawTexture(texture,Vector2.Zero);
 			ci?.DrawSetTransformMatrix(Transform2D.Identity);
-		}, priority);
+		}, (int)priority);
 
 	public void DrawNavMesh(XElement element) =>
 		element.Elements("DynamicNavNode")
@@ -338,6 +525,29 @@ public class LevelReader
 			.SelectMany(e => e.Elements("NavNode"))
 			.ForEach(DrawNavLine);
 	
+	public void DrawHordePath(Dir dir, int path)
+	{
+		if(Goals.Count <= 0) return;
+
+		path %= 20;
+		
+		List<Vector2> points = dir switch
+		{
+			Dir.Top => TopPaths[path],
+			Dir.Right => RightPaths[path],
+			Dir.Bottom => BottomPaths[path],
+			Dir.Left => LeftPaths[path],
+			_ => null
+		};
+
+		var color = cf.Horde["PathColor"].AsColor();
+		for(int i = 0; i < points.Count; ++i)
+		{
+			DrawCircle(points[i], 10, color, Priority.HordePath);
+			if(i != 0) DrawLine(points[i], points[i-1], color, Priority.HordePath);
+		}
+	}
+
 	public void DrawBlastzoneBounds(XElement element)
 	{
 		//get camera bounds
@@ -669,7 +879,7 @@ public class LevelReader
 					}
 					
 					//draw line
-					DrawLine(pos, (pos+navnodesPositions[norms])/2f, cf.Colors[$"Navnode{types}"], priority: NAVNODE_PRIORITY);
+					DrawLine(pos, (pos+navnodesPositions[norms])/2f, cf.Colors[$"Navnode{types}"], priority: Priority.Navnode);
 				}
 		);
 	}
@@ -687,7 +897,7 @@ public class LevelReader
 	//////////////////////////////////////////
 	////////////////Assets////////////////////
 	//////////////////////////////////////////
-	public void DrawAsset(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName, string assetNameOverride = "", int priority=ASSET_PRIORITY)
+	public void DrawAsset(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName, string assetNameOverride = "", Priority priority=Priority.Asset)
 	{
 		//get position
 		var offset = doOffset?element.GetElementPositionOrDefault():Vector2.Zero;
@@ -712,7 +922,7 @@ public class LevelReader
 		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", instanceName, bounds, hasSkulls, theme, priority);
 	}
 	
-	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="", int priority=ASSET_PRIORITY, bool swf=false)
+	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="", Priority priority=Priority.Asset, bool swf=false)
 	{
 		//check for conditionally drawn assets
 		if(
@@ -746,7 +956,7 @@ public class LevelReader
 		DrawTexture(texture, trans, priority);
 	}
 	
-	public void DrawBackground(XElement element, Transform2D trans = default) => DrawAsset(element.Parent.Elements("CameraBounds").First(), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
+	public void DrawBackground(XElement element, Transform2D trans = default) => DrawAsset(element.Parent.Element("CameraBounds"), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
 	
 	public void DrawPlatform(XElement element, Transform2D trans = default)
 	{
@@ -924,10 +1134,10 @@ public class LevelReader
 		
 		//draw
 		
-		DrawAssetFromData(blueOnesTrans, Vector2.Zero, blueOneName, priority: DIGIT_PRIORITY, swf:true);
-		if(blueDouble)DrawAssetFromData(blueTensTrans, Vector2.Zero, blueTenName, priority: DIGIT_PRIORITY, swf:true);
-		DrawAssetFromData(redOnesTrans, Vector2.Zero, redOneName, priority: DIGIT_PRIORITY, swf:true);
-		if(redDouble)DrawAssetFromData(redTensTrans, Vector2.Zero, redTenName, priority: DIGIT_PRIORITY, swf:true);
+		DrawAssetFromData(blueOnesTrans, Vector2.Zero, blueOneName, priority: Priority.Digit, swf:true);
+		if(blueDouble)DrawAssetFromData(blueTensTrans, Vector2.Zero, blueTenName, priority: Priority.Digit, swf:true);
+		DrawAssetFromData(redOnesTrans, Vector2.Zero, redOneName, priority: Priority.Digit, swf:true);
+		if(redDouble)DrawAssetFromData(redTensTrans, Vector2.Zero, redTenName, priority: Priority.Digit, swf:true);
 	}
 
 	public void DrawPressurePlateSprite(XElement element, Transform2D trans = default)

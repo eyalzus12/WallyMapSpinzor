@@ -2,12 +2,12 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-public class DumbPriorityQueue<TElement>
+public class LinearPriorityQueue<TElement>
 {
     public List<Queue<TElement>> PriorityList{get; set;}
     public int MinimumUsedPriority{get; private set;}
 
-    public DumbPriorityQueue(int priorityCount)
+    public LinearPriorityQueue(int priorityCount)
     {
         PriorityList = new(priorityCount);
         for(int i = 0; i < priorityCount; ++i) PriorityList.Add(new());

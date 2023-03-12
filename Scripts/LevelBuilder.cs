@@ -70,7 +70,24 @@ public partial class LevelBuilder : Node2D
 		{
 			configReader.Load(configReader.FilePath);
 			SetSettings();
-			levelreader = new LevelReader(this, configReader);
+			levelreader.SetupReader();
+			shouldRedraw = true;
+		}
+
+		if(inputChecker("change_path"))
+		{levelreader.selectedPath++;Display($"Showing path {levelreader.selectedPath}");shouldRedraw = true;}
+
+		if(inputChecker("change_dir"))
+		{
+			levelreader.selectedDir = levelreader.selectedDir switch
+			{
+				LevelReader.Dir.Top => LevelReader.Dir.Right,
+				LevelReader.Dir.Right => LevelReader.Dir.Bottom,
+				LevelReader.Dir.Bottom => LevelReader.Dir.Left,
+				LevelReader.Dir.Left => LevelReader.Dir.Top,
+				_ => LevelReader.Dir.Top
+			};
+			Display($"Showing dir {levelreader.selectedDir}");
 			shouldRedraw = true;
 		}
 		

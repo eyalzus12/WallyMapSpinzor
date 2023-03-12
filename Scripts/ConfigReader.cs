@@ -9,6 +9,7 @@ public partial class ConfigReader
 	
 	public Dictionary<string, string> Paths{get; set;} = new();
 	public Dictionary<string, string> Swf{get; set;} = new();
+	public Dictionary<string, Variant> Horde{get; set;} = new();
 	public Dictionary<string, bool> Display{get; set;} = new();
 	public Dictionary<string, float> Sizes{get; set;} = new();
 	public Dictionary<string, Color> Colors{get; set;} = new();
@@ -28,6 +29,7 @@ public partial class ConfigReader
 	{
 		StorePaths();
 		StoreSWF();
+		StoreHorde();
 		StoreDisplays();
 		StoreSizes();
 		StoreColors();
@@ -44,6 +46,12 @@ public partial class ConfigReader
 	public void StoreSWF()
 	{
 		foreach(var key in cf.GetSectionKeys(SWF)) Swf[key] = cf.GetValue(SWF, key).AsString();
+	}
+
+	public const string HORDE = "Horde";
+	public void StoreHorde()
+	{
+		foreach(var key in cf.GetSectionKeys(HORDE)) Horde[key] = cf.GetValue(HORDE, key);
 	}
 	
 	public const string DISPLAY = "Display";
