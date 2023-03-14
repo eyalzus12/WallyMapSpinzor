@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 public static class Utils
 {
-	public static Dictionary<(string, string), ImageTexture> Cache = new();
+	public static Dictionary<string, ImageTexture> Cache = new();
 	
 	public static string GetSubElementValue(this XElement element, string elementValue, string @default = "") => element.Element(elementValue)?.Value ?? @default;
 	public static float GetFloatSubElementValue(this XElement element, string elementValue, float @default = 0f) => float.Parse(element.GetSubElementValue(elementValue, $"{@default}"));
@@ -146,14 +146,14 @@ public static class Utils
 	
 	public static ImageTexture LoadImageFromSWF(string dir, string name)
 	{
-		if(Cache.ContainsKey((name,""))) return Cache[(name,"")];
+		if(Cache.ContainsKey(name)) return Cache[name];
 
 		var swfdir = DirAccess.Open(dir);
 		var er = DirAccess.GetOpenError();
 		if(er != Error.Ok)
 		{
 			GD.PushError($"Got error {er} while attempting to open dir {dir}");
-			Cache.Add((name,""), null);
+			Cache.Add(name, null);
 			return null;
 		}
 		var dirs = swfdir.GetDirectories();
@@ -161,33 +161,26 @@ public static class Utils
 		var desiredDir = dirs.Where(d => regex.IsMatch(d)).First();
 		var fullpath = $"{dir}/{desiredDir}/1.png";
 		
-		var texture = LoadImageFromPath(fullpath, "", default);
-		Cache.Add((name,""), texture);
+		var texture = LoadImageFromPath(fullpath);
+		Cache.Add(name, texture);
 		return texture;
 	}
 
-	public static ImageTexture LoadImageFromPath(string path, string instanceName, Vector2 bounds)
+	public static ImageTexture LoadImageFromPath(string path)
 	{
-		if(Cache.ContainsKey((path,instanceName))) return Cache[(path,instanceName)];
-		if(OS.HasFeature("editor")) GD.Print($"Loading {path}" + ((instanceName == "")?"":$" with instance {instanceName}"));
+		if(Cache.ContainsKey(path)) return Cache[path];
+		if(OS.HasFeature("editor")) GD.Print($"Loading {path}");
 		var image = new Image();
 		var er = image.Load(path);
 		if(er != Error.Ok) 
 		{
 			GD.PushError($"Got error {er} while attempting to load image from path {path}");
-			Cache.Add((path,instanceName), null);
+			Cache.Add(path, null);
 			return null;
 		}
 		
-		if(bounds.X == 0f) bounds.X = image.GetWidth();
-		if(bounds.Y == 0f) bounds.Y = image.GetHeight();
-		
-		bounds = bounds.Abs();
-
-		image.Resize((int)bounds.X, (int)bounds.Y);
-		
 		var texture = ImageTexture.CreateFromImage(image);
-		Cache.Add((path,instanceName), texture);
+		Cache.Add(path, texture);
 		return texture;
 	}
 	

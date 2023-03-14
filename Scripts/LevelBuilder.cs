@@ -90,9 +90,6 @@ public partial class LevelBuilder : Node2D
 			Display($"Showing dir {levelreader.selectedDir}");
 			shouldRedraw = true;
 		}
-		
-		if(Input.IsActionJustPressed("clear_cache"))
-		{levelreader.instanceNameCounter.Clear();Utils.Cache.Clear();shouldRedraw = true;}
 
 		if(Input.IsActionJustPressed("toggle_no_skulls"))
 		{levelreader.noSkulls = !levelreader.noSkulls;shouldRedraw = true;}

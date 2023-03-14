@@ -22,7 +22,6 @@ public class LevelReader
 	public Dictionary<int, KeyframeStepper> movingPlatformsDict = new();
 	public Dictionary<int, XElement> movingPlatformsElementDict = new();
 	public Dictionary<int, Vector2> navnodesPositions = new();
-	public Dictionary<string, int> instanceNameCounter = new();
 	public LinearPriorityQueue<Action> draws = new(Enum.GetNames<Priority>().Length);
 	
 	public int defaultNumFrames;
@@ -445,7 +444,6 @@ public class LevelReader
 		//clear lists
 		draws.Clear();
 		navnodesPositions.Clear();
-		instanceNameCounter.Clear();
 
 		//correct scores
 		redCount = Math.Max(Math.Min(redCount,99), 0);
@@ -522,13 +520,30 @@ public class LevelReader
 			ci?.DrawSetTransformMatrix(Transform2D.Identity);
 		}, (int)priority);
 	
-	public void DrawTexture(Texture2D texture, Transform2D trans, Priority priority = Priority.Asset) =>
+	public void DrawTexture(Texture2D texture, Transform2D trans, Vector2 bounds, Priority priority = Priority.Asset)
+	{
+		//flip if negative width/height
+		if(bounds.X < 0f) trans = trans.ScaledLocal(new Vector2(-1,1));
+		else if(bounds.X == 0) bounds.X = texture.GetSize().X;
+
+		if(bounds.Y < 0f) trans = trans.ScaledLocal(new Vector2(1,-1));
+		else if(bounds.Y == 0) bounds.Y = texture.GetSize().Y;
+
+		var rect = new Rect2(Vector2.Zero, bounds);
+
+		if(cf.Display["AssetPosition"])
+		DrawCircle(trans.Origin, cf.Sizes["AssetPositionRadius"], cf.Colors["Asset"]);
+		if(cf.Display["AssetRect"])
+		DrawRect(rect, cf.Colors["Asset"], false, trans: trans);
+		
 		draws.Enqueue(() => 
 		{
 			ci?.DrawSetTransformMatrix(trans);
-			ci?.DrawTexture(texture,Vector2.Zero);
+			ci?.DrawTextureRect(texture, rect, false);
 			ci?.DrawSetTransformMatrix(Transform2D.Identity);
 		}, (int)priority);
+	}
+		
 
 	public void DrawNavMesh(XElement element) =>
 		element.Elements("DynamicNavNode")
@@ -909,7 +924,7 @@ public class LevelReader
 	//////////////////////////////////////////
 	////////////////Assets////////////////////
 	//////////////////////////////////////////
-	public void DrawAsset(XElement element, Transform2D trans, bool doOffset, string assetfolder, string instanceName, string assetNameOverride = "", Priority priority=Priority.Asset)
+	public void DrawAsset(XElement element, Transform2D trans, bool doOffset, string assetfolder, string assetNameOverride = "", Priority priority=Priority.Asset)
 	{
 		//get position
 		var offset = doOffset?element.GetElementPositionOrDefault():Vector2.Zero;
@@ -931,68 +946,46 @@ public class LevelReader
 		var theme = element.GetAttribute("Theme");
 		
 		//draw asset
-		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", instanceName, bounds, hasSkulls, theme, priority);
+		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", bounds, hasSkulls, theme, priority);
 	}
 	
-	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, string instanceName = "", Vector2 bounds = default, bool hasSkulls = false, string theme="", Priority priority=Priority.Asset, bool swf=false)
+	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, Vector2 bounds = default, bool hasSkulls = false, string theme="", Priority priority=Priority.Asset, bool swf=false)
 	{
 		//check for conditionally drawn assets
 		if(
 			//check for no skulls
-			(!noSkulls && instanceName.EndsWith("am_NoSkulls")) ||
-			(!noSkulls && path.EndsWith("_NoSkulls.jpg")) ||
+			(!noSkulls && path.Contains("NoSkulls")) ||
 			(noSkulls && hasSkulls) ||
 			//check for theme
 			(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s)))
 		) return;
 		
 		//load texture
-		var texture = !swf?Utils.LoadImageFromPath(path, instanceName, bounds):Utils.LoadImageFromSWF(cf.Swf["GameModesExport"], path);
+		var texture = !swf?Utils.LoadImageFromPath(path):Utils.LoadImageFromSWF(cf.Swf["GameModesExport"], path);
 
 		//texture doesn't exist
 		if(texture is null) return;
 
 		//move
 		trans = trans.TranslatedLocal(offset);
-
-		//flip if negative width/height
-		if(bounds.X < 0f) trans = trans.ScaledLocal(new Vector2(-1,1));
-		if(bounds.Y < 0f) trans = trans.ScaledLocal(new Vector2(1,-1));
 		
-		//draw asset position
-		if(cf.Display["AssetPosition"])
-		DrawCircle(trans.Origin, cf.Sizes["AssetPositionRadius"], cf.Colors["Asset"]);
-		if(cf.Display["AssetRect"])
-		DrawRect(new Rect2(Vector2.Zero, texture.GetSize()), cf.Colors["Asset"], false, trans: trans);
-		
-		DrawTexture(texture, trans, priority);
+		DrawTexture(texture, trans, bounds, priority);
 	}
 	
-	public void DrawBackground(XElement element, Transform2D trans = default) => DrawAsset(element.Parent.Element("CameraBounds"), trans, true, "Backgrounds", "", element.GetAttribute("AssetName"));
+	public void DrawBackground(XElement element, Transform2D trans = default) => DrawAsset(element.Parent.Element("CameraBounds"), trans, true, "Backgrounds", element.GetAttribute("AssetName"));
 	
 	public void DrawPlatform(XElement element, Transform2D trans = default)
 	{
 		//check theme
 		var theme = element.GetAttribute("Theme");
 		if(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s))) return;
-
-		//get instance name
-		var instanceName = element.GetAttribute("InstanceName");
-		//first time this instance name happens
-		if(!instanceNameCounter.ContainsKey(instanceName)) instanceNameCounter[instanceName] = -1;
-		//increase instance name count
-		instanceNameCounter[instanceName]++;
-		//change instance name to ensure no conflicts
-		instanceName = instanceNameCounter[instanceName].ToString() + "_" + instanceName;
 		
 		//apply position, scale, and rotation
 		trans = trans
-		.TranslatedLocal(//move
-			element.GetElementPositionOrDefault()
-		)
-		.ScaledLocal(//scale
-			element.GetElementPositionOrDefault("Scale",1)*element.GetFloatAttribute("Scale", 1)
-		);
+		//move
+		.TranslatedLocal(element.GetElementPositionOrDefault())
+		//scale
+		.ScaledLocal(element.GetElementPositionOrDefault("Scale",1)*element.GetFloatAttribute("Scale", 1));
 
 		//for some reason, using RotatedLocal doesn't work properly
 		//so need to manually add the rotation
@@ -1011,7 +1004,7 @@ public class LevelReader
 					{
 						//child is an asset
 						case "Asset":
-							DrawAsset(e, trans, true, assetDir, instanceName);
+							DrawAsset(e, trans, true, assetDir);
 							return;
 						//child is a platofrm
 						case "Platform":
@@ -1024,11 +1017,7 @@ public class LevelReader
 			);
 		}
 		//has its own asset
-		else DrawAsset(element, trans, false, assetDir, instanceName);
-
-		//display instance name
-		if(cf.Display["PlatformLabel"])
-			DrawString($"InstanceName: {instanceName}", trans.Origin);
+		else DrawAsset(element, trans, false, assetDir);
 	}
 	
 	public void DrawMovingPlatform(XElement element, Transform2D trans = default)
