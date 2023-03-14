@@ -424,6 +424,7 @@ public class LevelReader
 		
 		if(cf.Display["Goals"]) generators.Add("Goal", DrawGoal);
 		if(cf.Display["NoDodgeZones"]) generators.Add("NoDodgeZone", DrawNoDodgeZone);
+		if(cf.Display["Volumes"]) generators.Add("Volume", DrawVolume);
 	}
 	
 	//helper functions
@@ -827,6 +828,7 @@ public class LevelReader
 	}
 
 	public void DrawNoDodgeZone(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["NoDodgeZone"]);
+	public void DrawVolume(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["Volume"]);
 	
 	//////////////////////////////////////////
 	//////////////Navigation//////////////////
