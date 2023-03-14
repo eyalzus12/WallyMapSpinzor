@@ -93,8 +93,18 @@ public class LevelReader
 		//load font
 		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
 		
-		//parse map and level types
-		parsedMapFile = XDocument.Parse(Utils.Read($"{mapFolder}{mapName}.xml"));
+		//read map files
+		var readMap = Utils.Read($"{mapFolder}{mapName}.xml");
+		//manual fixes for certain bmg bs
+		readMap = mapName switch
+		{
+			"SynthwaveSoccer" => readMap.Replace("\u202c",""),
+			"OneUpOneDownFFA3" => readMap.Replace("\"X", "\" X"),
+			"HordeTwo" => readMap.Replace("`",""),
+			_ => readMap
+		};
+
+		parsedMapFile = XDocument.Parse(readMap);
 		parsedLevelTypes = (levelTypesPath == "")?null:XDocument.Parse(Utils.Read(levelTypesPath));
 		
 		//init generators

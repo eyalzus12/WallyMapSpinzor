@@ -17,7 +17,7 @@ public static class Utils
 	public static string GetAttribute(this XElement element, string attribute, string @default = "")
 	{
 		if(!element.HasAttribute(attribute)) return @default;
-		return element.Attribute(attribute).Value.Trim('\u202c');
+		return element.Attribute(attribute).Value;
 	}
 	
 	public static bool GetBooleanAttribute(this XElement element, string attribute, bool @default = false)
