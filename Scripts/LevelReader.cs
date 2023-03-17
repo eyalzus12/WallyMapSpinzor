@@ -38,7 +38,10 @@ public class LevelReader
 	
 	public bool noSkulls = false;
 	public HashSet<string> themes = new();
-	
+	public string scoringType = "";
+	public string controls = "";
+
+
 	public string mapFolder;
 	public string swfPath;
 	public string mapName;
@@ -88,6 +91,8 @@ public class LevelReader
 		blueCount = cf.Others["BlueScore"].AsInt32();
 		noSkulls = cf.Others["NoSkulls"].AsBool();
 		themes = cf.Others["Themes"].AsString().Split(",").Select(s=>s.Trim()).Append("").ToHashSet();
+		controls  = cf.Others["Controls"].AsString();
+		scoringType = cf.Others["ScoringType"].AsString();
 		
 		//load font
 		font = ResourceLoader.Load<Font>(cf.Paths["Font"]);
@@ -942,22 +947,19 @@ public class LevelReader
 		
 		//get if has skulls
 		var hasSkulls = element.GetBooleanAttribute("HasSkulls", false);
-		//get theme
-		var theme = element.GetAttribute("Theme");
 		
 		//draw asset
-		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", bounds, hasSkulls, theme, priority);
+		DrawAssetFromData(trans, offset, $"{mapArtPath}{assetpath}", bounds, hasSkulls, priority);
 	}
 	
-	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, Vector2 bounds = default, bool hasSkulls = false, string theme="", Priority priority=Priority.Asset, bool swf=false)
+	public void DrawAssetFromData(Transform2D trans, Vector2 offset, string path, Vector2 bounds = default, bool hasSkulls = false, Priority priority=Priority.Asset, bool swf=false)
 	{
 		//check for conditionally drawn assets
 		if(
-			//check for no skulls
-			(!noSkulls && path.Contains("NoSkulls")) ||
-			(noSkulls && hasSkulls) ||
-			//check for theme
-			(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s)))
+			//check for skulls in background
+			(noSkulls && hasSkulls)||
+			//hacky check for no-skulls background
+			(!noSkulls && path.EndsWith("_NoSkulls.jpg"))
 		) return;
 		
 		//load texture
@@ -974,11 +976,24 @@ public class LevelReader
 	
 	public void DrawBackground(XElement element, Transform2D trans = default) => DrawAsset(element.Parent.Element("CameraBounds"), trans, true, "Backgrounds", element.GetAttribute("AssetName"));
 	
+	public bool ShouldDrawPlatform(XElement element)
+	{
+		var instanceName = element.GetAttribute("InstanceName");
+		//no skulls
+		if(instanceName.StartsWith("am_NoSkulls")) return noSkulls;
+		//controls
+		if(controls != "" && instanceName.StartsWith("am_Hotkey")) return controls == instanceName.Substring(instanceName.LastIndexOf('_')+1);
+		//scoring type
+		if(element.GetAttribute("ScoringType","XXX")==scoringType)return true;
+		//theme
+		if(element.HasAttribute("Theme") && element.GetAttribute("Theme").Split(",").All(s=>!themes.Contains(s))) return false;
+		
+		return true;
+	}
+
 	public void DrawPlatform(XElement element, Transform2D trans = default)
 	{
-		//check theme
-		var theme = element.GetAttribute("Theme");
-		if(theme != "" && theme.Split(",").All((s)=>!themes.Contains(s))) return;
+		if(!ShouldDrawPlatform(element)) return;
 		
 		//apply position, scale, and rotation
 		trans = trans
