@@ -155,7 +155,7 @@ public static class Utils
 
 	public static SwfFile swf = null;
 	
-	public static ImageTexture LoadImageFromSWF(string path, string spriteName)
+	public static ImageTexture LoadImageFromSWF(string dir, string spriteName)
 	{
 		if(Cache.ContainsKey(spriteName)) return Cache[spriteName];
 
@@ -243,28 +243,6 @@ public static class Utils
 	public static void TextureFromShape4(DefineShape4Tag t)
 	{
 		//no
-	}
-
-	public static ImageTexture LoadImageFromPath(string path)
-	{
-		if(Cache.ContainsKey(name)) return Cache[name];
-
-		var swfdir = DirAccess.Open(dir);
-		var er = DirAccess.GetOpenError();
-		if(er != Error.Ok)
-		{
-			GD.PushError($"Got error {er} while attempting to open dir {dir}");
-			Cache.Add(name, null);
-			return null;
-		}
-		var dirs = swfdir.GetDirectories();
-		var regex = new Regex($@"^DefineSprite_\d*_a_{name}$", RegexOptions.Compiled);
-		var desiredDir = dirs.Where(d => regex.IsMatch(d)).First();
-		var fullpath = $"{dir}/{desiredDir}/1.png";
-		
-		var texture = LoadImageFromPath(fullpath);
-		Cache.Add(name, texture);
-		return texture;
 	}
 
 	public static ImageTexture LoadImageFromPath(string path)

@@ -524,13 +524,13 @@ public class LevelReader
 	public void DrawTexture(Texture2D texture, Transform2D trans, Vector2 bounds, Priority priority = Priority.Asset)
 	{
 		//flip if negative width/height
-		if(bounds.X < 0f) trans = trans.ScaledLocal(new Vector2(-1,1));
+		if(bounds.X < 0f) trans *= Transform2D.FlipX;
 		else if(bounds.X == 0) bounds.X = texture.GetSize().X;
 
-		if(bounds.Y < 0f) trans = trans.ScaledLocal(new Vector2(1,-1));
+		if(bounds.Y < 0f) trans *= Transform2D.FlipY;
 		else if(bounds.Y == 0) bounds.Y = texture.GetSize().Y;
 
-		var rect = new Rect2(Vector2.Zero, bounds);
+		var rect = new Rect2(Vector2.Zero, bounds.Abs());
 
 		if(cf.Display["AssetPosition"])
 		DrawCircle(trans.Origin, cf.Sizes["AssetPositionRadius"], cf.Colors["Asset"]);
