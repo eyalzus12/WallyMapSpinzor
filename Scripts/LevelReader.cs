@@ -332,13 +332,9 @@ public class LevelReader
 		for(int i = 0; i < 10; ++i)
 		{
 			redCount = i;
-			for(int j = 0; j < 10; ++j)
-			{
-				blueCount = j;
-				
-				first.Elements("TeamScoreboard")
-					.ForEach(e => DrawScoreboard(e));
-			}
+			blueCount = i;
+			first.Elements("TeamScoreboard")
+				.ForEach(e => DrawScoreboard(e));
 		}
 		
 		redCount = tempred;
@@ -1142,11 +1138,11 @@ public class LevelReader
 		var blueFont = element.GetAttribute("BlueDigitFont");
 		
 		//get file names
-		var redOneName = $"Digit{redOne}" + (redFont==""?"":"_") + redFont;
-		var redTenName = $"Digit{redTen}" + (redFont==""?"":"_") + redFont;
+		var redOneName = $"a_Digit{redOne}" + (redFont==""?"":"_") + redFont;
+		var redTenName = $"a_Digit{redTen}" + (redFont==""?"":"_") + redFont;
 		
-		var blueOneName = $"Digit{blueOne}" + (blueFont==""?"":"_") + blueFont;
-		var blueTenName = $"Digit{blueTen}" + (blueFont==""?"":"_") + blueFont;
+		var blueOneName = $"a_Digit{blueOne}" + (blueFont==""?"":"_") + blueFont;
+		var blueTenName = $"a_Digit{blueTen}" + (blueFont==""?"":"_") + blueFont;
 		
 		//draw
 		
@@ -1160,7 +1156,7 @@ public class LevelReader
 	{
 		var assetName = element.GetAttribute("AssetName");
 		var trimmedName = assetName.TrimPrefix("a__AnimationPressurePlate");
-		var finalName = "ClimbPressurePlate" + (trimmedName==""?"":"_") + trimmedName;
+		var finalName = "a_ClimbPressurePlate" + (trimmedName==""?"":"_") + trimmedName;
 		var pos = element.GetElementPositionOrDefault("AnimOffset");
 
 		//handle moving platform

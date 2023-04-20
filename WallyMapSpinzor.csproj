@@ -1,5 +1,11 @@
 <Project Sdk="Godot.NET.Sdk/4.0.0">
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
+    <RootNamespace>WallyMapSpinzor</RootNamespace>
+    <AssemblyName>WallyMapSpinzor</AssemblyName>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SwfLib" Version="1.0.5"/>
+  </ItemGroup>
 </Project>

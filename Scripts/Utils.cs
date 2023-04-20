@@ -4,6 +4,15 @@ using System.Collections.Generic;
 using System.Xml.Linq;
 using System.Linq;
 using System.Text.RegularExpressions;
+using SwfLib;
+using SwfLib.Tags;
+using SwfLib.Tags.ControlTags;
+using SwfLib.Tags.DisplayListTags;
+using SwfLib.Tags.ShapeTags;
+using SwfLib.Shapes.Records;
+using SwfLib.Shapes.FillStyles;
+using SwfLib.Shapes.LineStyles;
+using System.IO;
 
 public static class Utils
 {
@@ -143,8 +152,100 @@ public static class Utils
 	{
 		foreach(var e in enumerable) action(e);
 	}
+
+	public static SwfFile swf = null;
 	
-	public static ImageTexture LoadImageFromSWF(string dir, string name)
+	public static ImageTexture LoadImageFromSWF(string path, string spriteName)
+	{
+		if(Cache.ContainsKey(spriteName)) return Cache[spriteName];
+
+		var swfdir = DirAccess.Open(dir);
+		var er = DirAccess.GetOpenError();
+		if(er != Error.Ok)
+		{
+			GD.PushError($"Got error {er} while attempting to open dir {dir}");
+			Cache.Add(spriteName, null);
+			return null;
+		}
+		var dirs = swfdir.GetDirectories();
+		var regex = new Regex($@"^DefineSprite_\d*_{spriteName}$", RegexOptions.Compiled);
+		var desiredDir = dirs.Where(d => regex.IsMatch(d)).First();
+		var fullpath = $"{dir}/{desiredDir}/1.png";
+		
+		var texture = LoadImageFromPath(fullpath);
+		Cache.Add(spriteName, texture);
+		return texture;
+
+		/*if(swf is null)
+		{
+			using (var source = File.Open(path, FileMode.Open))
+			{
+				swf = SwfFile.ReadFrom(source);
+			}
+		}
+
+		//get symbol class
+		var symbolClass = swf.Tags.FirstOrDefault(t => t is SymbolClassTag) as SymbolClassTag;
+		if(symbolClass is null) {GD.PushError($"Failed to find symbol class in swf file {path} looking for sprite {spriteName}");return null;}
+		//get sprite id
+		var spriteId = symbolClass.References.FirstOrDefault(r => r.SymbolName == spriteName)?.SymbolID;
+		if(spriteId is null) {GD.PushError($"Failed to find sprite id for {spriteName} in swf file {path}");return null;}
+		//get sprite
+		var sprite = swf.Tags.FirstOrDefault(t => t is DefineSpriteTag st && st.SpriteID == spriteId) as DefineSpriteTag;
+		if(sprite is null) {GD.PushError($"Failed to find define sprite for {spriteName} in swf file {path}");return null;}
+		//get place object
+		var placeTag = sprite.Tags.FirstOrDefault(t => t is PlaceObjectBaseTag) as PlaceObjectBaseTag;
+		if(placeTag is null) {GD.PushError($"Failed to find place tag for sprite {spriteName} in swf file {path}");return null;}
+		//get character id
+		var characterID = placeTag.CharacterID;
+		//get shape
+		var shape = swf.Tags.FirstOrDefault(t => t is ShapeBaseTag st && st.ShapeID == characterID) as ShapeBaseTag;
+		if(shape is null) {GD.PushError($"Failed to find define shape for {spriteName} in swf file {path}");return null;}
+		
+		GD.Print(shape.ToString());
+		return null;*/
+	}
+
+	public static void TextureFromRecordsRGB(IList<IShapeRecordRGB> records, IList<FillStyleRGB> fillStyles, IList<LineStyleRGB> lineStyles)
+	{
+
+	}
+
+	public static void TextureFromRecordsRGBA(IList<IShapeRecordRGBA> records, IList<FillStyleRGBA> fillStyles, IList<LineStyleRGBA> lineStyles)
+	{
+
+	}
+
+	public static void TextureFromShape(DefineShapeTag t)
+	{
+		var fillStyles = t.FillStyles;//rgb
+		var lineStyles = t.LineStyles;//rgb
+		var records =  t.ShapeRecords;//rgb
+		TextureFromRecordsRGB(records, fillStyles, lineStyles);
+	}
+
+	public static void TextureFromShape2(DefineShape2Tag t)
+	{
+		var fillStyles = t.FillStyles;//rgb
+		var lineStyles = t.LineStyles;//rgb
+		var records =  t.ShapeRecords;//rgb
+		TextureFromRecordsRGB(records, fillStyles, lineStyles);
+	}
+
+	public static void TextureFromShape3(DefineShape3Tag t)
+	{
+		var fillStyles = t.FillStyles;//rgba
+		var lineStyles = t.LineStyles;//rgba
+		var records =  t.ShapeRecords;//rgba
+		TextureFromRecordsRGBA(records, fillStyles, lineStyles);
+	}
+
+	public static void TextureFromShape4(DefineShape4Tag t)
+	{
+		//no
+	}
+
+	public static ImageTexture LoadImageFromPath(string path)
 	{
 		if(Cache.ContainsKey(name)) return Cache[name];
 
@@ -186,8 +287,8 @@ public static class Utils
 	
 	public static string Read(string filepath)
 	{
-		var f = FileAccess.Open(filepath, FileAccess.ModeFlags.Read);
-		var er = FileAccess.GetOpenError();
+		var f = Godot.FileAccess.Open(filepath, Godot.FileAccess.ModeFlags.Read);
+		var er = Godot.FileAccess.GetOpenError();
 		if(er != Error.Ok)
 		{
 			GD.PushError($"Error {er} while reading file {filepath}");
