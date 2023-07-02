@@ -546,7 +546,6 @@ public class LevelReader
             ci?.DrawSetTransformMatrix(Transform2D.Identity);
         }, (int)priority);
     }
-        
 
     public void DrawNavMesh(XElement element) =>
         element.Elements("DynamicNavNode")
