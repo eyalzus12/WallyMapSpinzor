@@ -47,10 +47,10 @@ script = ExtResource("2")
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
 [node name="FileDialog" type="FileDialog" parent="CanvasLayer"]
-initial_position = 2
-title = "Open a File"
-size = Vector2i(1152, 648)
 mode = 3
+title = "Open a File"
+initial_position = 2
+size = Vector2i(1152, 648)
 popup_window = true
 ok_button_text = "Open"
 file_mode = 0

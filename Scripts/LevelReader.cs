@@ -647,9 +647,9 @@ public class LevelReader
     //////////////////////////////////////////
     ///////////////Item Spawns////////////////
     //////////////////////////////////////////
-    public void DrawArea(XElement element, Vector2 offset, Color color)
+    public void DrawArea(XElement element, Vector2 offset, Color color, float defaultW = 0, float defaultH = 0)
     {
-        var rect = element.GetElementRect();
+        var rect = element.GetElementRect(defaultW,defaultH);
         rect.Position += offset;
         //if point
         if(rect.Size.X == 0 && rect.Size.Y == 0)
@@ -667,10 +667,10 @@ public class LevelReader
             DrawRect(rect, color, true);
     }
     
-    public void DrawItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSpawn"]);
-    public void DrawInitialItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["InitialItemSpawn"]);
-    public void DrawItemSet(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSet"]);
-    public void DrawTeamItemInitSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["TeamItemInitSpawn"]);
+    public void DrawItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSpawn"], 0, 10);
+    public void DrawInitialItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["InitialItemSpawn"], 50, 50);
+    public void DrawItemSet(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSet"], 40, 40);
+    public void DrawTeamItemInitSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["TeamItemInitSpawn"], 50, 50);
     
     //////////////////////////////////////////
     /////////////////Respawns/////////////////
@@ -872,7 +872,7 @@ public class LevelReader
     
     public void DrawNavLine(XElement element)
     {
-        //get navid    
+        //get navid
         var navid = element.GetAttribute("NavID");
         //get numerical id
         var id = NormalizeNavID(navid);

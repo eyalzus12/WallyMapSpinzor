@@ -68,10 +68,10 @@ public static class Utils
         return new Vector2(x, y);
     }
     
-    public static Vector2 GetElementBoundsOrDefault(this XElement element)
+    public static Vector2 GetElementBoundsOrDefault(this XElement element, float doubleW=0, float doubleH=0)
     {
-        var w = element.GetFloatAttribute("W", 0);
-        var h = element.GetFloatAttribute("H", 0);
+        var w = element.GetFloatAttribute("W", doubleW);
+        var h = element.GetFloatAttribute("H", doubleH);
         return new Vector2(w, h);
     }
     
@@ -108,10 +108,10 @@ public static class Utils
         return (fromPos, toPos);
     }
     
-    public static Rect2 GetElementRect(this XElement element)
+    public static Rect2 GetElementRect(this XElement element, float defaultW=0, float defaultH=0)
     {
         var pos = element.GetElementPosition();
-        var bounds = element.GetElementBoundsOrDefault();
+        var bounds = element.GetElementBoundsOrDefault(defaultW,defaultH);
         return new Rect2(pos, bounds);
     }
     
