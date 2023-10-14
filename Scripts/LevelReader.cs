@@ -489,6 +489,7 @@ public class LevelReader
     public void ResetTime()
     {
         movingPlatformsDict.Clear();
+        movingPlatformsElementDict.Clear();
         (parsedMapFile.FirstNode as XElement).Elements("MovingPlatform").ForEach(SetupMovingPlatform);
     }
     
@@ -647,7 +648,7 @@ public class LevelReader
     //////////////////////////////////////////
     ///////////////Item Spawns////////////////
     //////////////////////////////////////////
-    public void DrawArea(XElement element, Vector2 offset, Color color, float defaultW = 0, float defaultH = 0)
+    public void DrawArea(XElement element, Vector2 offset, Color color, float defaultW = 0, float defaultH = 0, bool drawCenter = false)
     {
         var rect = element.GetElementRect(defaultW,defaultH);
         rect.Position += offset;
@@ -657,20 +658,27 @@ public class LevelReader
             var rad = cf.Sizes["DefaultAreaRadius"];
             var newrect = new Rect2(rect.Position - rad*Vector2.One, 2f*rad*Vector2.One);
             DrawRect(newrect, color, false);
-            DrawCircle(rect.Position, rad/2f, color);
+            DrawCircle(rect.Position, rad/3f, color);
         }
         //if line
         else if(rect.Size.X == 0 || rect.Size.Y == 0)
             DrawLine(rect.Position, rect.End, color);
         //if proper rect
         else
+        {
             DrawRect(rect, color, true);
+            if(drawCenter)
+            {
+                var rad = cf.Sizes["DefaultAreaRadius"];
+                DrawCircle(rect.Position + rect.Size/2f, rad/3f, color);
+            }
+        }
     }
     
     public void DrawItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSpawn"], 0, 10);
-    public void DrawInitialItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["InitialItemSpawn"], 50, 50);
-    public void DrawItemSet(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSet"], 40, 40);
-    public void DrawTeamItemInitSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["TeamItemInitSpawn"], 50, 50);
+    public void DrawInitialItemSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["InitialItemSpawn"], 50, 50, true);
+    public void DrawItemSet(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["ItemSet"], 40, 40, true);
+    public void DrawTeamItemInitSpawn(XElement element, Vector2 offset = default) => DrawArea(element, offset, cf.Colors["TeamItemInitSpawn"], 50, 50, true);
     
     //////////////////////////////////////////
     /////////////////Respawns/////////////////
